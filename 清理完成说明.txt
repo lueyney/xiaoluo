@@ -1,0 +1,123 @@
+# 项目清理完成
+
+## ✅ 已删除的文件
+
+### 1. 临时MD文档（50+个）
+- 开发过程文档
+- 调试说明
+- 问题记录
+- 已全部删除 ✅
+
+### 2. 测试文件
+- base.wxml
+- comp.js
+- comp.json
+- comp.wxml
+- utils.wxs
+- vendors.js
+- 已全部删除 ✅
+
+## ✅ 项目结构（前后端已分离）
+
+```
+2025.9.24/                    项目根目录
+│
+├── backend-code/             后端（Express.js）
+│   ├── app.js
+│   ├── routes/
+│   │   ├── auth.js          认证
+│   │   ├── user.js          用户
+│   │   ├── payment.js       支付 ✨新增
+│   │   ├── order.js         订单
+│   │   ├── document.js      文档
+│   │   └── ...
+│   ├── config/
+│   ├── middleware/
+│   ├── utils/
+│   ├── database/
+│   │   └── create_payment_orders.sql  ✨新增
+│   ├── .env
+│   └── package.json
+│
+├── pages/                    前端页面
+├── components/              前端组件
+├── utils/                   前端工具
+├── assets/                  资源文件
+├── app.js                   小程序入口
+├── app.json                 小程序配置
+├── .gitignore
+└── README.md                项目说明 ✨新增
+```
+
+## ✅ 新增功能
+
+### 支付后端API
+
+#### 1. 创建充值订单
+```
+POST /api/payment/create-order
+{
+  "packageId": 1,
+  "amount": 1,
+  "credits": 51
+}
+```
+
+#### 2. 支付成功回调（模拟）
+```
+POST /api/payment/mock-success
+{
+  "orderId": 1
+}
+```
+
+#### 3. 查询订单状态
+```
+GET /api/payment/order/:orderId
+```
+
+### 支付逻辑
+- 创建订单记录
+- 支付成功后增加积分
+- 记录积分变动
+- 事务保证一致性
+
+### 数据库表
+- payment_orders: 充值订单表
+
+---
+
+## 📝 保留的文件
+
+### 核心文件
+- README.md: 项目总说明
+- .gitignore: Git忽略配置
+
+### 前端（小程序）
+- 所有pages/, components/, utils/
+- app.js, app.json
+- 所有功能代码
+
+### 后端（Express.js）
+- 所有routes/, config/, utils/
+- app.js
+- 所有功能代码
+
+---
+
+## 🚀 启动方式
+
+### 后端
+```bash
+cd backend-code
+node app.js
+```
+
+### 前端
+微信开发者工具打开项目根目录
+
+---
+
+**清理完成时间**: 2025-10-30
+**项目状态**: 整洁、清晰、前后端分离
+

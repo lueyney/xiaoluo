@@ -1,0 +1,68 @@
+{
+  "pages": [
+    "pages/writing/index",
+    "pages/library/index",
+    "pages/rewrite/index",
+    "pages/orders/index",
+    "pages/profile/index",
+    "pages/register/index",
+    "pages/login/index",
+    "pages/recharge/index",
+    "pages/payment-records/index",
+    "pages/document-preview/index",
+    "pages/profile/help/index",
+    "pages/profile/settings/index",
+    "pages/profile/notice/index",
+    "pages/profile/privacy/index",
+    "pages/profile/wheel/index"
+  ],
+  "usingComponents": {
+    "phone-login-modal": "/components/phone-login-modal/index"
+  },
+  "window": {
+    "backgroundTextStyle": "light",
+    "navigationBarBackgroundColor": "#ffffff",
+    "navigationBarTitleText": "论文君",
+    "navigationBarTextStyle": "black",
+    "backgroundColor": "#f8fafc"
+  },
+  "tabBar": {
+    "color": "#666666",
+    "selectedColor": "#2563eb",
+    "backgroundColor": "#ffffff",
+    "borderStyle": "black",
+    "list": [
+      {
+        "pagePath": "pages/writing/index",
+        "text": "AI创作",
+        "iconPath": "assets/tab-writing.png",
+        "selectedIconPath": "assets/tab-writing-active.png"
+      },
+      {
+        "pagePath": "pages/library/index",
+        "text": "文档库",
+        "iconPath": "assets/tab-library.png",
+        "selectedIconPath": "assets/tab-library-active.png"
+      },
+      {
+        "pagePath": "pages/rewrite/index",
+        "text": "AI降重",
+        "iconPath": "assets/tab-rewrite.png",
+        "selectedIconPath": "assets/tab-rewrite-active.png"
+      },
+      {
+        "pagePath": "pages/orders/index",
+        "text": "订单",
+        "iconPath": "assets/tab-orders.png",
+        "selectedIconPath": "assets/tab-orders-active.png"
+      },
+      {
+        "pagePath": "pages/profile/index",
+        "text": "我的",
+        "iconPath": "assets/tab-profile.png",
+        "selectedIconPath": "assets/tab-profile-active.png"
+      }
+    ]
+  },
+  "lazyCodeLoading": "requiredComponents"
+}

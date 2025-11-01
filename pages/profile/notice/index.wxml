@@ -1,0 +1,56 @@
+<view class="notice-page">
+  <view class="hero-card">
+    <text class="hero-title">消息通知</text>
+    <text class="hero-subtitle">掌握最新活动、系统动态与安全提醒</text>
+    <view class="hero-switch">
+      <text class="hero-switch-text">开启全部通知</text>
+      <switch checked="{{globalNotify}}" bindchange="onToggleGlobal"></switch>
+    </view>
+    <button class="outline-btn" bindtap="markAllRead">全部标记已读</button>
+  </view>
+
+  <view class="section-card">
+    <text class="section-title">通知渠道</text>
+    <view class="setting-item" data-key="app" bindtap="noop">
+      <view class="setting-texts">
+        <text class="setting-name">站内推送</text>
+        <text class="setting-desc">第一时间获取系统通知</text>
+      </view>
+      <switch checked="{{channels.app}}" data-key="app" bindchange="onToggleChannel"></switch>
+    </view>
+    <view class="setting-item">
+      <view class="setting-texts">
+        <text class="setting-name">邮件提醒</text>
+        <text class="setting-desc">每周推送使用报告与活动</text>
+      </view>
+      <switch checked="{{channels.mail}}" data-key="mail" bindchange="onToggleChannel"></switch>
+    </view>
+    <view class="setting-item">
+      <view class="setting-texts">
+        <text class="setting-name">短信通知</text>
+        <text class="setting-desc">充值与安全等重要通知</text>
+      </view>
+      <switch checked="{{channels.sms}}" data-key="sms" bindchange="onToggleChannel"></switch>
+    </view>
+  </view>
+
+  <view class="section-card">
+    <text class="section-title">最近通知</text>
+    <block wx:for="{{notifications}}" wx:key="id">
+      <view class="notice-item {{item.unread ? 'unread' : ''}}" data-id="{{item.id}}" bindtap="onNoticeTap">
+        <view class="notice-meta">
+          <text class="notice-tag">{{item.category}}</text>
+          <text class="notice-time">{{item.time}}</text>
+        </view>
+        <text class="notice-title">{{item.title}}</text>
+        <text class="notice-desc">{{item.desc}}</text>
+      </view>
+    </block>
+    <view wx:if="{{!notifications.length}}" class="empty-state">
+      <text class="empty-icon">📭</text>
+      <text class="empty-text">暂无通知</text>
+      <text class="empty-desc">开启通知功能即可收到最新消息</text>
+    </view>
+  </view>
+</view>
+

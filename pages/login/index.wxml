@@ -1,0 +1,77 @@
+<view class="login-page">
+  <view class="login-hero">
+    <image class="login-hero__icon" src="/assets/app-logo.png" mode="aspectFill"></image>
+    <text class="login-hero__title">论文君</text>
+    <text class="login-hero__subtitle">在这里，灵感不再是转瞬即逝的火花，而是可以被捕捉、延展的无限可能</text>
+  </view>
+
+  <view class="login-card">
+    <view class="login-tabs">
+      <view class="login-tabs__item {{activeTab === 'password' ? 'login-tabs__item--active' : ''}}" data-tab="password" bindtap="switchTab">密码登录</view>
+      <view class="login-tabs__item {{activeTab === 'code' ? 'login-tabs__item--active' : ''}}" data-tab="code" bindtap="switchTab">验证码登录</view>
+    </view>
+
+    <view class="form-field">
+      <view class="form-field__label">手机号</view>
+      <view class="form-input">
+        <text class="form-input__icon">📱</text>
+        <input class="form-input__control" type="number" placeholder="请输入手机号" maxlength="11" value="{{phone}}" bindinput="onPhoneInput" />
+      </view>
+    </view>
+
+    <block wx:if="{{activeTab === 'password'}}">
+      <view class="form-field">
+        <view class="form-field__label">密码</view>
+        <view class="form-input">
+          <text class="form-input__icon">🔒</text>
+          <input class="form-input__control" password="{{!showPassword}}" placeholder="请输入密码" maxlength="32" value="{{password}}" bindinput="onPasswordInput" />
+          <text class="form-input__suffix" bindtap="togglePassword">{{showPassword ? '🙈' : '👁️'}}</text>
+        </view>
+      </view>
+    </block>
+
+    <block wx:if="{{activeTab === 'code'}}">
+      <view class="form-field">
+        <view class="form-field__label form-field__label--inline">
+          <text>验证码</text>
+          <text class="form-input__suffix form-input__suffix--link" bindtap="sendCode">{{isCodeSent ? countdown + 's后重发' : '获取验证码'}}</text>
+        </view>
+        <view class="form-input">
+          <text class="form-input__icon">🔢</text>
+          <input class="form-input__control" type="number" placeholder="请输入6位验证码" maxlength="6" value="{{code}}" bindinput="onCodeInput" />
+        </view>
+      </view>
+    </block>
+
+    <button class="login-btn" loading="{{isLoading}}" disabled="{{isLoading}}" bindtap="login">{{isLoading ? '登录中...' : '立即登录'}}</button>
+
+    <view class="login-extra">
+      <text class="login-extra__text">没有账户？</text>
+      <text class="login-extra__link" hover-class="login-extra__link--active" bindtap="goRegister">立即注册</text>
+    </view>
+  </view>
+
+  <view class="login-features">
+    <view class="login-feature">
+      <view class="login-feature__icon login-feature__icon--ai">🤖</view>
+      <view class="login-feature__content">
+        <text class="login-feature__title">AI智能写作</text>
+        <text class="login-feature__desc">高效生成学术论文</text>
+      </view>
+    </view>
+    <view class="login-feature">
+      <view class="login-feature__icon login-feature__icon--multi">📄</view>
+      <view class="login-feature__content">
+        <text class="login-feature__title">多种文档类型</text>
+        <text class="login-feature__desc">满足学术需求</text>
+      </view>
+    </view>
+    <view class="login-feature">
+      <view class="login-feature__icon login-feature__icon--rewrite">🛡️</view>
+      <view class="login-feature__content">
+        <text class="login-feature__title">专业降重服务</text>
+        <text class="login-feature__desc">确保原创性</text>
+      </view>
+    </view>
+  </view>
+</view>

@@ -1,0 +1,25 @@
+.notice-page{min-height:100vh;padding:32rpx 24rpx 120rpx;background:linear-gradient(180deg,#eef4ff 0%,#ffffff 60%,#f8fbff 100%);box-sizing:border-box;display:flex;flex-direction:column;gap:28rpx}
+.hero-card{background:#ffffff;border-radius:40rpx;padding:32rpx;box-shadow:0 24rpx 56rpx rgba(59,130,246,0.12);display:flex;flex-direction:column;gap:16rpx}
+.hero-title{font-size:40rpx;font-weight:700;color:#1f2937;margin-bottom:6rpx}
+.hero-subtitle{font-size:26rpx;color:#64748b}
+.hero-switch{margin-top:12rpx;display:flex;justify-content:space-between;align-items:center}
+.hero-switch-text{font-size:26rpx;color:#1f2937;font-weight:600}
+.section-card{background:#ffffff;border-radius:36rpx;padding:30rpx;box-shadow:0 20rpx 48rpx rgba(15,23,42,0.08);display:flex;flex-direction:column;gap:20rpx}
+.section-title{font-size:32rpx;font-weight:700;color:#1f2937}
+.setting-item{display:flex;justify-content:space-between;align-items:center;padding:20rpx 0;border-bottom:1rpx solid rgba(226,232,240,0.6)}
+.setting-item:last-child{border-bottom:none}
+.setting-texts{display:flex;flex-direction:column;gap:6rpx}
+.setting-name{font-size:28rpx;font-weight:600;color:#1f2937}
+.setting-desc{font-size:24rpx;color:#64748b}
+.notice-item{border-radius:28rpx;background:rgba(248,250,252,0.95);padding:24rpx;box-shadow:0 14rpx 32rpx rgba(148,163,184,0.18);display:flex;flex-direction:column;gap:12rpx}
+.notice-item.unread{border:1rpx solid rgba(79,70,229,0.35);box-shadow:0 14rpx 38rpx rgba(79,70,229,0.2)}
+.notice-meta{display:flex;justify-content:space-between;color:#6366f1;font-size:22rpx}
+.notice-tag{background:rgba(99,102,241,0.16);padding:6rpx 16rpx;border-radius:9999rpx}
+.notice-time{color:#94a3b8}
+.notice-title{font-size:28rpx;font-weight:600;color:#1f2937}
+.notice-desc{font-size:24rpx;color:#475569}
+.empty-state{text-align:center;padding:36rpx;border:1rpx dashed rgba(148,163,184,0.4);border-radius:28rpx;color:#64748b}
+.empty-icon{font-size:40rpx;margin-bottom:12rpx;display:block}
+.empty-text{font-size:28rpx;font-weight:600;color:#1f2937;margin-bottom:6rpx}
+.empty-desc{font-size:24rpx}
+

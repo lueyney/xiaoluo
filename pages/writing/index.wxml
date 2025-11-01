@@ -1,0 +1,234 @@
+<view class="writing-page">
+  <view class="top-card">
+    <view class="top-card__row">
+      <view class="top-card__brand">
+        <image class="top-card__icon" src="/assets/app-logo.png" mode="aspectFill"></image>
+        <view class="top-card__info">
+          <text class="top-card__name">论文君</text>
+          <text class="top-card__desc">AI智能写作平台</text>
+        </view>
+      </view>
+      <view class="top-card__credit">
+        <view class="credit-chip">
+          <text class="credit-icon">💎</text>
+          <text class="credit-value">{{credits}}</text>
+        </view>
+      </view>
+    </view>
+    <text class="top-card__slogan">在这里，灵感不再是转瞬即逝的火花，而是可以被捕捉、延展的无限可能</text>
+    <view class="top-card__actions">
+      <view class="sample-button" bindtap="goToLibrary">
+        <text class="sample-icon">👀</text>
+        <text class="sample-text">查看示例论文</text>
+      </view>
+    </view>
+  </view>
+
+  <scroll-view scroll-y="true" class="content-scroll">
+    <view class="content-scroll__inner">
+      <view class="section-card basic-info">
+        <view class="section-header">
+          <text class="section-icon">🪄</text>
+          <view class="section-header-text">
+            <view class="section-title">基本信息</view>
+            <view class="section-caption">填写学科领域和论文基础信息</view>
+          </view>
+        </view>
+        <view class="form-field">
+          <text class="field-label">学科领域 *</text>
+          <view class="field-control select-control" bindtap="openFieldSelector">
+            <text>{{formData.field || '请选择或输入学科领域'}}</text>
+            <text class="select-arrow">▼</text>
+          </view>
+        </view>
+        <view class="form-field">
+          <view class="field-label-row">
+            <text class="field-label">论文题目 *</text>
+            <view class="title-suggest-btn-sm" bindtap="onGenerateTitle">
+              <text class="title-suggest-icon-sm">{{isGeneratingTitle ? '⟳' : '✨'}}</text>
+              <text class="title-suggest-text-sm">{{isGeneratingTitle ? '生成中' : 'AI起名'}}</text>
+            </view>
+          </view>
+          <input class="title-input-full" placeholder="请输入论文题目或研究主题" value="{{formData.topic}}" bindinput="onTopicInput" maxlength="100" />
+          <text class="field-hint">请确保题目准确，以便生成更符合需求的内容</text>
+        </view>
+      </view>
+
+      <view class="section-card content-types">
+        <view class="section-header">
+          <text class="section-icon">⚡</text>
+          <view class="section-header-text">
+            <view class="section-title">生成内容 *(可多选)</view>
+            <view class="section-caption">选择需要生成的文档类型</view>
+          </view>
+        </view>
+        <view class="content-type-container">
+          <block wx:for="{{contentTypes}}" wx:key="value">
+            <view class="content-type-item">
+              <view class="content-type-card {{item.selected ? 'content-type-selected' : ''}}" data-value="{{item.value}}" bindtap="toggleContentType">
+                <text class="content-type-icon">{{item.icon}}</text>
+                <text class="content-type-label">{{item.label}}</text>
+                <text class="content-type-description">{{item.description}}</text>
+                <view class="badge {{item.selected ? 'badge-default' : 'badge-secondary'}}">{{item.credits}} 积分</view>
+              </view>
+            </view>
+          </block>
+        </view>
+      </view>
+
+      <view class="section-card optional-settings">
+        <view class="section-header">
+          <text class="section-icon">⚙️</text>
+          <view class="section-header-text">
+            <view class="section-title">其他信息</view>
+            <view class="section-caption">可选配置，点击展开设置</view>
+          </view>
+        </view>
+        <view class="setting-card">
+          <view class="setting-item" bindtap="toggleTitleSettings">
+            <view class="setting-left">
+              <view class="setting-icon setting-icon-blue">🎼</view>
+              <view class="setting-texts">
+                <text class="setting-title">标题格式配置</text>
+                <text class="setting-subtitle">自定义多级标题样式</text>
+              </view>
+            </view>
+            <text class="setting-arrow">{{titleSettingsOpen ? '▲' : '▼'}}</text>
+          </view>
+          <view wx:if="{{titleSettingsOpen}}" class="setting-body">
+            <view class="setting-field">
+              <text class="setting-label">一级标题格式</text>
+              <picker mode="selector" range="{{titleLevel1Options}}" value="{{titleLevel1Index}}" bindchange="onSelectTitleLevel1">
+                <view class="setting-picker">
+                  <text>{{titleLevel1Options[titleLevel1Index]}}</text>
+                  <text class="picker-arrow">▼</text>
+                </view>
+              </picker>
+            </view>
+            <view class="setting-field">
+              <text class="setting-label">二级标题格式</text>
+              <picker mode="selector" range="{{titleLevel2Options}}" value="{{titleLevel2Index}}" bindchange="onSelectTitleLevel2">
+                <view class="setting-picker">
+                  <text>{{titleLevel2Options[titleLevel2Index]}}</text>
+                  <text class="picker-arrow">▼</text>
+                </view>
+              </picker>
+            </view>
+          </view>
+        </view>
+
+        <view class="setting-card">
+          <view class="setting-item" bindtap="toggleDetailSettings">
+            <view class="setting-left">
+              <view class="setting-icon setting-icon-green">📝</view>
+              <view class="setting-texts">
+                <text class="setting-title">详细要求</text>
+                <text class="setting-subtitle">填写字数、格式及重点信息</text>
+              </view>
+            </view>
+            <text class="setting-arrow">{{detailSettingsOpen ? '▲' : '▼'}}</text>
+          </view>
+          <view wx:if="{{detailSettingsOpen}}" class="setting-body">
+            <textarea class="textarea-native" placeholder="请描述详细要求，包含字数、格式及重点内容" maxlength="500" value="{{requirements}}" bindinput="onRequirementsInput"></textarea>
+          </view>
+        </view>
+      </view>
+
+      <view wx:if="{{selectedSummary !== '请选择生成类型'}}" class="summary-card {{isBalanceNotEnough ? 'warn' : ''}}">
+        <view class="summary-card__row">
+          <view class="summary-card__metric">
+            <view class="summary-card__label">预计消耗</view>
+            <view class="summary-card__value cost">{{totalCost}} 积分</view>
+          </view>
+          <view class="summary-card__metric">
+            <view class="summary-card__label">当前余额</view>
+            <view class="summary-card__value balance">{{credits}} 积分</view>
+          </view>
+        </view>
+        <view class="summary-card__detail">
+          <text class="summary-card__selected">{{selectedSummary}}</text>
+          <text class="summary-card__desc">生成后将自动创建 docx 文档保存到文档库</text>
+        </view>
+      </view>
+
+      <view class="generate-action">
+        <button class="{{generateBtnClass}}" loading="{{isGenerating}}" disabled="{{generateDisabled}}" bindtap="onGenerate">
+          <text class="generate-icon">{{isGenerating ? '⟳' : (isBalanceNotEnough ? '💰' : '✨')}}</text>
+          <text class="generate-text">{{generateButtonText}}</text>
+          <text wx:if="{{!isGenerating && !isBalanceNotEnough}}" class="generate-arrow">→</text>
+        </button>
+      </view>
+
+      <view class="tips-panel">
+        <text class="tip-item">生成的内容仅供参考，请务必进行人工审核和修改</text>
+        <text class="tip-item">论文君遵守学术规范，生成内容原创性高</text>
+        <text class="tip-item">如有疑问请联系客服或查看帮助文档</text>
+      </view>
+
+      <view wx:if="{{generatedContent}}" class="result-card">
+        <view class="result-content">
+          <text class="result-text">{{generatedContent}}</text>
+        </view>
+        <view class="result-actions">
+          <button class="outline-btn" bindtap="onSaveContent">💾 保存文档</button>
+          <button class="outline-btn" bindtap="noop">📤 导出</button>
+          <button class="primary-btn" bindtap="noop">🔄 继续优化</button>
+        </view>
+      </view>
+    </view>
+  </scroll-view>
+  
+  <view wx:if="{{showFieldSelector}}" class="field-selector-overlay" bindtap="closeFieldSelector">
+    <view class="field-selector-container" catchtap="noop">
+      <view class="field-selector-header">
+        <text class="field-selector-title">选择学科领域</text>
+        <view class="field-selector-close" bindtap="closeFieldSelector">✕</view>
+      </view>
+      
+      <view class="field-selector-search">
+        <input 
+          class="field-search-input" 
+          placeholder="搜索学科或输入自定义内容"
+          value="{{fieldSearchText}}"
+          bindinput="onFieldSearch"
+          confirm-type="done"
+          bindconfirm="useCustomField"
+          focus="{{shouldFocusSearch}}"
+        />
+        <view wx:if="{{hasSearchText}}" class="field-search-confirm" bindtap="useCustomField">
+          <text>确定</text>
+        </view>
+      </view>
+      
+      <scroll-view scroll-y class="field-selector-list" enable-flex>
+        <view wx:if="{{showCustomOption}}" class="field-custom-hint">
+          <text class="hint-icon">💡</text>
+          <text class="hint-text">未找到匹配学科，点击"确定"使用自定义内容</text>
+        </view>
+        
+        <view wx:if="{{showCustomOption}}" class="field-custom-option" bindtap="useCustomField">
+          <text class="custom-icon">➕</text>
+          <text class="custom-text">添加自定义学科：{{fieldSearchText}}</text>
+        </view>
+        
+        <view 
+          wx:for="{{filteredFields}}" 
+          wx:key="*this"
+          class="field-option"
+          data-field="{{item}}"
+          bindtap="selectField"
+        >
+          <text class="field-option-text">{{item}}</text>
+          <text class="field-option-check">{{formData.field === item ? '✓' : ''}}</text>
+        </view>
+        
+        <view wx:if="{{filteredFields.length === 0 && !hasSearchText}}" class="field-empty">
+          <text>暂无学科</text>
+        </view>
+      </scroll-view>
+    </view>
+  </view>
+
+  <!-- 手机号一键登录弹窗 -->
+  <phone-login-modal show="{{showPhoneLoginModal}}" bind:close="onPhoneLoginClose" bind:success="onPhoneLoginSuccess"></phone-login-modal>
+</view>

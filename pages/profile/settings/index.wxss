@@ -1,0 +1,25 @@
+.settings-page{min-height:100vh;padding:32rpx 24rpx 120rpx;background:linear-gradient(180deg,#eef4ff 0%,#ffffff 60%,#f8fbff 100%);box-sizing:border-box;display:flex;flex-direction:column;gap:28rpx}
+.info-card{background:#ffffff;border-radius:40rpx;padding:32rpx;box-shadow:0 24rpx 56rpx rgba(79,70,229,0.12);display:flex;flex-direction:column;gap:24rpx}
+.info-header{display:flex;align-items:center;gap:20rpx}
+.avatar{width:96rpx;height:96rpx;border-radius:32rpx;background:linear-gradient(135deg,#6366f1,#a855f7);display:flex;align-items:center;justify-content:center;color:#fff;font-size:42rpx;font-weight:700;box-shadow:0 16rpx 36rpx rgba(99,102,241,0.25)}
+.info-texts{flex:1;display:flex;flex-direction:column;gap:8rpx}
+.info-name{font-size:34rpx;font-weight:700;color:#1f2937;margin-bottom:6rpx}
+.info-phone{font-size:24rpx;color:#64748b}
+.outline-btn{padding:0 32rpx;height:64rpx;border-radius:24rpx;border:1rpx solid rgba(79,70,229,0.4);background:rgba(255,255,255,0.6);color:#4f46e5;font-size:24rpx}
+.info-footer{display:flex;align-items:center;gap:12rpx}
+.badge{padding:10rpx 24rpx;border-radius:9999rpx;background:rgba(253,230,138,0.9);color:#92400e;font-size:22rpx;font-weight:600}
+.info-desc{font-size:24rpx;color:#64748b}
+.section-card{background:#ffffff;border-radius:36rpx;padding:30rpx;box-shadow:0 20rpx 48rpx rgba(15,23,42,0.1);display:flex;flex-direction:column;gap:20rpx}
+.section-title{font-size:32rpx;font-weight:700;color:#1f2937}
+.setting-item{display:flex;justify-content:space-between;align-items:center;padding:20rpx 0;border-bottom:1rpx solid rgba(226,232,240,0.6)}
+.setting-item:last-child{border-bottom:none}
+.setting-texts{display:flex;flex-direction:column;gap:6rpx}
+.setting-name{font-size:28rpx;font-weight:600;color:#1f2937}
+.setting-desc{font-size:24rpx;color:#64748b}
+.action-item{display:flex;justify-content:space-between;align-items:center;padding:22rpx 0;border-bottom:1rpx solid rgba(226,232,240,0.6)}
+.action-item:last-child{border-bottom:none}
+.action-texts{display:flex;flex-direction:column;gap:6rpx}
+.action-name{font-size:28rpx;font-weight:600;color:#1f2937}
+.action-desc{font-size:24rpx;color:#64748b}
+.action-arrow{font-size:32rpx;color:#cbd5f5}
+

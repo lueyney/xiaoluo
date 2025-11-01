@@ -1,0 +1,12 @@
+"use strict";const e=require("./taro.js"),a="";const {ensureCredits:ensureCredits}=require("./utils/points.js");const {ensureNotifications:ensureNotifications}=require("./utils/notifications.js");function r({children:a}){return e.taroExports.useLaunch(()=>{console.log("App launched.")}),a}var t={pages:["pages/writing/index","pages/library/index","pages/rewrite/index","pages/orders/index","pages/profile/index","pages/login/index","pages/profile/help/index","pages/profile/settings/index","pages/profile/notice/index","pages/profile/privacy/index"],window:{backgroundTextStyle:"light",navigationBarBackgroundColor:"#fff",navigationBarTitleText:"\u8bba\u6587\u541b",navigationBarTextStyle:"black",backgroundColor:"#f8fafc"},tabBar:{color:"#666666",selectedColor:"#2563eb",backgroundColor:"#ffffff",borderStyle:"black",list:[{pagePath:"pages/writing/index",text:"\u270f\ufe0f\nAI\u521b\u4f5c"},{pagePath:"pages/library/index",text:"\ud83d\udcda\n\u6587\u6863\u5e93"},{pagePath:"pages/rewrite/index",text:"\ud83d\udd04\nAI\u964d\u91cd"},{pagePath:"pages/orders/index",text:"\ud83d\udcb3\n\u8ba2\u5355"},{pagePath:"pages/profile/index",text:"\ud83d\udc64\n\u6211\u7684"}]},lazyCodeLoading:"requiredComponents"};e.taroWindowProvider.__taroAppConfig=t,App({
+  globalData: {
+    apiBaseUrl: "http://127.0.0.1:3000",
+    userInfo: null
+  },
+  onLaunch() {
+    console.log("App launched.");
+    ensureCredits();
+    ensureNotifications();
+    wx.setStorageSync("apiBaseUrl", this.globalData.apiBaseUrl);
+  }
+});

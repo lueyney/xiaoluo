@@ -1,0 +1,67 @@
+<view class="settings-page">
+  <view class="info-card">
+    <view class="info-header">
+      <view class="avatar">学</view>
+      <view class="info-texts">
+        <text class="info-name">学术研究者</text>
+        <text class="info-phone">手机号：138****0000</text>
+      </view>
+      <button class="outline-btn" bindtap="editProfile">编辑</button>
+    </view>
+    <view class="info-footer">
+      <view class="badge">VIP会员</view>
+      <text class="info-desc">注册于 2024-01-01</text>
+    </view>
+  </view>
+
+  <view class="section-card">
+    <text class="section-title">偏好设置</text>
+    <view class="setting-item">
+      <view class="setting-texts">
+        <text class="setting-name">启用深色模式</text>
+        <text class="setting-desc">自动根据系统切换主题</text>
+      </view>
+      <switch checked="{{preferences.darkMode}}" data-key="darkMode" bindchange="onTogglePreference"></switch>
+    </view>
+    <view class="setting-item">
+      <view class="setting-texts">
+        <text class="setting-name">自动保存内容</text>
+        <text class="setting-desc">生成内容后自动存入文档库</text>
+      </view>
+      <switch checked="{{preferences.autoSave}}" data-key="autoSave" bindchange="onTogglePreference"></switch>
+    </view>
+    <view class="setting-item">
+      <view class="setting-texts">
+        <text class="setting-name">接收邮件订阅</text>
+        <text class="setting-desc">获取产品更新与活动提醒</text>
+      </view>
+      <switch checked="{{preferences.emailNotify}}" data-key="emailNotify" bindchange="onTogglePreference"></switch>
+    </view>
+  </view>
+
+  <view class="section-card">
+    <text class="section-title">安全管理</text>
+    <view class="action-item" data-type="password" bindtap="onActionTap">
+      <view class="action-texts">
+        <text class="action-name">修改登录密码</text>
+        <text class="action-desc">建议定期更换密码提升安全</text>
+      </view>
+      <text class="action-arrow">›</text>
+    </view>
+    <view class="action-item" data-type="email" bindtap="onActionTap">
+      <view class="action-texts">
+        <text class="action-name">绑定邮箱</text>
+        <text class="action-desc">用于找回密码与安全通知</text>
+      </view>
+      <text class="action-arrow">›</text>
+    </view>
+    <view class="action-item" data-type="logout" bindtap="onActionTap">
+      <view class="action-texts">
+        <text class="action-name">退出所有设备</text>
+        <text class="action-desc">如检测异常登录可立即操作</text>
+      </view>
+      <text class="action-arrow">›</text>
+    </view>
+  </view>
+</view>
+

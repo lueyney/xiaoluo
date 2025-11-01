@@ -1,0 +1,100 @@
+<view class="help-page">
+  <view class="hero-card">
+    <view class="hero-texts">
+      <text class="hero-title">帮助中心</text>
+      <text class="hero-subtitle">为您提供全面的使用指南和技术支持</text>
+    </view>
+    
+    <!-- 客服联系方式 -->
+    <view class="contact-section">
+      <view class="contact-title">
+        <text class="contact-title-icon">📞</text>
+        <text class="contact-title-text">联系我们</text>
+      </view>
+      
+      <view class="contact-info-card">
+        <view class="contact-item">
+          <view class="contact-label">
+            <text class="label-icon">📱</text>
+            <text class="label-text">客服电话</text>
+          </view>
+          <text class="contact-value" selectable="true">18166973213</text>
+          <button class="contact-action" data-phone="18166973213" bindtap="onCallPhone">
+            <text>拨打</text>
+          </button>
+        </view>
+        
+        <view class="contact-divider"></view>
+        
+        <view class="contact-item">
+          <view class="contact-label">
+            <text class="label-icon">📧</text>
+            <text class="label-text">客服邮箱</text>
+          </view>
+          <text class="contact-value" selectable="true">whai9424@gmail.com</text>
+          <button class="contact-action" data-email="whai9424@gmail.com" bindtap="onCopyEmail">
+            <text>复制</text>
+          </button>
+        </view>
+        
+        <view class="contact-divider"></view>
+        
+        <view class="contact-item">
+          <view class="contact-label">
+            <text class="label-icon">⏰</text>
+            <text class="label-text">服务时间</text>
+          </view>
+          <text class="contact-value">工作日 9:00-18:00</text>
+        </view>
+      </view>
+      
+      <view class="contact-tip">
+        <text class="tip-icon">💡</text>
+        <text class="tip-text">邮件咨询请注明您的手机号，以便我们更好地为您服务</text>
+      </view>
+    </view>
+  </view>
+
+  <view class="search-card">
+    <view class="search-input">
+      <text class="search-icon">🔍</text>
+      <input placeholder="搜索常见问题..." placeholder-class="search-placeholder" value="{{searchKeyword}}" bindinput="onSearchInput" />
+    </view>
+  </view>
+
+  <view class="tag-group">
+    <block wx:for="{{categories}}" wx:key="value">
+      <view class="tag {{item.value === activeCategory ? 'active' : ''}}" data-value="{{item.value}}" bindtap="onCategoryChange">{{item.label}}</view>
+    </block>
+  </view>
+
+  <view class="faq-section">
+    <view class="faq-title-wrapper">
+      <text class="faq-title">常见问题</text>
+      <text class="faq-subtitle">汇总使用指南与积分相关问题</text>
+    </view>
+    <block wx:for="{{filteredFaqs}}" wx:key="id">
+      <view class="faq-card">
+        <view class="faq-header" data-id="{{item.id}}" bindtap="toggleFaq">
+          <view class="faq-header-left">
+            <text class="faq-icon">❔</text>
+            <view class="faq-title-wrapper">
+              <text class="faq-question">{{item.title}}</text>
+              <text class="faq-tag">{{item.categoryLabel}}</text>
+            </view>
+          </view>
+          <text class="faq-arrow">{{openFaqId === item.id ? '▲' : '▼'}}</text>
+        </view>
+        <view wx:if="{{openFaqId === item.id}}" class="faq-content">
+          <text>{{item.content}}</text>
+        </view>
+      </view>
+    </block>
+    <view wx:if="{{!filteredFaqs.length}}" class="empty-state">
+      <text class="empty-icon">🔎</text>
+      <text class="empty-text">未找到相关问题</text>
+      <text class="empty-desc">试着调整关键词或分类</text>
+    </view>
+  </view>
+</view>
+

@@ -1,0 +1,50 @@
+.help-page{min-height:100vh;padding:32rpx 24rpx 120rpx;background:linear-gradient(180deg,#eef4ff 0%,#ffffff 60%,#f8fbff 100%);box-sizing:border-box}
+.hero-card{background:#ffffff;border-radius:40rpx;padding:32rpx;box-shadow:0 24rpx 56rpx rgba(59,130,246,0.12);display:flex;flex-direction:column;gap:24rpx}
+.hero-title{font-size:40rpx;font-weight:700;color:#1f2937;margin-bottom:6rpx}
+.hero-subtitle{font-size:26rpx;color:#475569}
+
+/* 联系方式区域 */
+.contact-section{margin-top:24rpx}
+.contact-title{display:flex;align-items:center;gap:12rpx;margin-bottom:20rpx}
+.contact-title-icon{font-size:32rpx}
+.contact-title-text{font-size:30rpx;font-weight:700;color:#1f2937}
+
+.contact-info-card{background:linear-gradient(135deg,#f8fafc,#f1f5f9);border-radius:24rpx;padding:24rpx;box-shadow:0 8rpx 24rpx rgba(15,23,42,0.06)}
+
+.contact-item{display:flex;align-items:center;justify-content:space-between;padding:16rpx 0}
+.contact-label{display:flex;align-items:center;gap:12rpx;flex:1}
+.label-icon{font-size:28rpx}
+.label-text{font-size:26rpx;color:#64748b;font-weight:500}
+.contact-value{font-size:28rpx;color:#1f2937;font-weight:600;flex:2;text-align:center}
+.contact-action{font-size:24rpx;padding:12rpx 28rpx;background:linear-gradient(135deg,#2563eb,#7c3aed);color:#ffffff;border-radius:20rpx;border:none}
+
+.contact-divider{height:1rpx;background:rgba(148,163,184,0.2);margin:8rpx 0}
+
+.contact-tip{margin-top:16rpx;padding:20rpx;background:rgba(59,130,246,0.08);border-radius:20rpx;border-left:6rpx solid #2563eb;display:flex;align-items:flex-start;gap:12rpx}
+.tip-icon{font-size:28rpx}
+.tip-text{font-size:24rpx;color:#475569;line-height:1.6;flex:1}
+.search-card{margin-top:28rpx;background:#ffffff;border-radius:36rpx;padding:18rpx 24rpx;box-shadow:0 20rpx 40rpx rgba(15,23,42,0.08)}
+.search-input{display:flex;align-items:center;background:rgba(248,250,252,0.9);border-radius:28rpx;padding:0 24rpx;height:80rpx}
+.search-icon{font-size:30rpx;color:#94a3b8;margin-right:12rpx}
+.search-placeholder{color:#94a3b8}
+.tag-group{margin-top:20rpx;display:flex;flex-wrap:wrap;gap:16rpx}
+.tag{padding:12rpx 28rpx;border-radius:9999rpx;background:rgba(148,163,184,0.12);color:#475569;font-size:24rpx}
+.tag.active{background:linear-gradient(135deg,#2563eb,#7c3aed);color:#ffffff;box-shadow:0 14rpx 28rpx rgba(79,70,229,0.26)}
+.faq-section{margin-top:32rpx;display:flex;flex-direction:column;gap:20rpx}
+.faq-title-wrapper{display:flex;flex-direction:column;gap:6rpx}
+.faq-title{font-size:32rpx;font-weight:700;color:#1f2937}
+.faq-subtitle{font-size:24rpx;color:#64748b}
+.faq-card{background:#ffffff;border-radius:30rpx;box-shadow:0 18rpx 40rpx rgba(15,23,42,0.08);padding:24rpx}
+.faq-header{display:flex;justify-content:space-between;align-items:center}
+.faq-header-left{display:flex;align-items:center;gap:16rpx}
+.faq-icon{width:48rpx;height:48rpx;border-radius:16rpx;background:rgba(37,99,235,0.12);display:flex;align-items:center;justify-content:center;font-size:28rpx;color:#2563eb}
+.faq-title-wrapper{display:flex;flex-direction:column;gap:6rpx}
+.faq-question{font-size:28rpx;font-weight:600;color:#1f2937}
+.faq-tag{font-size:22rpx;color:#6366f1;background:rgba(99,102,241,0.12);border-radius:9999rpx;padding:6rpx 18rpx}
+.faq-arrow{font-size:28rpx;color:#94a3b8}
+.faq-content{margin-top:16rpx;font-size:24rpx;color:#4b5563;line-height:1.6}
+.empty-state{margin-top:20rpx;border-radius:28rpx;padding:40rpx;border:1rpx dashed rgba(148,163,184,0.4);text-align:center;color:#64748b}
+.empty-icon{font-size:42rpx;margin-bottom:12rpx;display:block}
+.empty-text{font-size:28rpx;font-weight:600;color:#1f2937;margin-bottom:8rpx}
+.empty-desc{font-size:24rpx}
+

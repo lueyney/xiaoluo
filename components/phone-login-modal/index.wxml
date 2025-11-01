@@ -1,0 +1,36 @@
+<view class="phone-login-modal" wx:if="{{show}}" catchtouchmove="preventTouchMove">
+  <view class="modal-mask" bindtap="onClose"></view>
+  <view class="modal-content">
+    <view class="modal-header">
+      <text class="modal-title">快速登录</text>
+      <view class="modal-close" bindtap="onClose">✕</view>
+    </view>
+    
+    <view class="modal-body">
+      <view class="welcome-section">
+        <image class="welcome-icon" src="/assets/app-logo.png" mode="aspectFill"></image>
+        <text class="welcome-title">欢迎使用论文君</text>
+        <text class="welcome-desc">使用微信手机号快速登录</text>
+      </view>
+      
+      <button 
+        class="phone-login-btn"
+        open-type="getPhoneNumber"
+        bindgetphonenumber="onGetPhoneNumber"
+        loading="{{loading}}"
+        disabled="{{loading}}">
+        <text class="btn-icon">📱</text>
+        <text class="btn-text">{{loading ? '登录中...' : '微信手机号一键登录'}}</text>
+      </button>
+      
+      <view class="login-tips">
+        <text class="tips-text">🔒 首次登录将自动为您注册账号</text>
+      </view>
+      
+      <view class="other-login" bindtap="goToLoginPage">
+        <text class="other-login-text">使用其他手机号登录</text>
+      </view>
+    </view>
+  </view>
+</view>
+

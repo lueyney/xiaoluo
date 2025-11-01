@@ -1,0 +1,60 @@
+<view class="library-page">
+  <view class="search-bar-simple">
+    <input class="search-input" placeholder="搜索文档..." bindinput="onSearchInput" value="{{searchValue}}" />
+    <button class="filter-trigger" bindtap="openTypePicker">{{selectedType}}</button>
+  </view>
+
+  <view wx:if="{{errorMessage}}" class="error-banner">
+    <text>{{errorMessage}}</text>
+  </view>
+
+  <view class="stats-section">
+    <view class="stats-card">
+      <view class="stats-item">
+        <text class="stats-value">{{filteredDocs.length}}</text>
+        <text class="stats-label">文档总数</text>
+      </view>
+      <view class="stats-divider"></view>
+      <view class="stats-item">
+        <text class="stats-value">{{totalWords}}</text>
+        <text class="stats-label">累计字数</text>
+      </view>
+    </view>
+  </view>
+
+  <scroll-view scroll-y="true" class="documents-scroll">
+    <view class="documents-scroll__inner">
+      <view wx:if="{{filteredDocs.length === 0}}" class="empty-state">
+        <text class="empty-icon">📝</text>
+        <text class="empty-title">暂无文档</text>
+        <text class="empty-tip">去创作内容或导入资料吧</text>
+        <button class="primary-btn" bindtap="goToWriting">开始创作</button>
+      </view>
+
+      <block wx:for="{{filteredDocs}}" wx:key="id">
+        <view class="doc-card">
+          <view class="doc-card__badge" style="background: {{item.badgeColor}};">
+            <text>{{item.type}}</text>
+          </view>
+          <view wx:if="{{item.isNew}}" class="doc-card__new-badge">
+            <text>新</text>
+          </view>
+          <view class="doc-card__body">
+            <view class="doc-card__header">
+              <text class="doc-card__title">{{item.title}}</text>
+              <text class="doc-card__meta">{{item.createdAt}} · {{item.wordCount}} 字</text>
+            </view>
+            <text class="doc-card__preview">{{item.preview}}</text>
+          </view>
+          <view class="doc-card__footer">
+            <button class="outline-btn" data-id="{{item.id}}" bindtap="onViewDoc">查看</button>
+            <button class="outline-btn" data-id="{{item.id}}" bindtap="onCopyDoc">复制</button>
+            <button class="outline-btn" data-id="{{item.id}}" bindtap="onDeleteDoc">删除</button>
+          </view>
+        </view>
+      </block>
+    </view>
+  </scroll-view>
+  <!-- 手机号一键登录弹窗 -->
+  <phone-login-modal show="{{showPhoneLoginModal}}" bind:close="onPhoneLoginClose" bind:success="onPhoneLoginSuccess"></phone-login-modal>
+</view>
