@@ -3,20 +3,16 @@
  */
 
 const auth = require("./auth.js");
+const { getApiBaseUrl } = require("./request.js");
 
-// 获取当前用户的文档存储key
 function getUserDocumentsKey() {
   const userData = auth.getUserInfo();
   if (userData && userData.id) {
     return `userDocuments_${userData.id}`;
   }
-  // 兼容旧版本
   return "savedDocs";
 }
 
-/**
- * 获取本地缓存的文档列表
- */
 function getDocuments() {
   const key = getUserDocumentsKey();
   const stored = wx.getStorageSync(key);
@@ -26,43 +22,28 @@ function getDocuments() {
   return [];
 }
 
-/**
- * 设置本地缓存的文档列表
- */
 function setDocuments(list) {
   const key = getUserDocumentsKey();
   wx.setStorageSync(key, list);
   return list;
 }
 
-/**
- * 添加文档到本地缓存
- */
 function addDocument(doc) {
   const list = getDocuments();
   list.unshift(doc);
   return setDocuments(list);
 }
 
-/**
- * 从本地缓存删除文档
- */
 function removeDocument(id) {
   const list = getDocuments().filter(item => item.id !== id);
   return setDocuments(list);
 }
 
-/**
- * 清除当前用户的文档缓存
- */
 function clearDocuments() {
   const key = getUserDocumentsKey();
   wx.removeStorageSync(key);
 }
 
-/**
- * 从服务器同步文档列表
- */
 async function syncDocumentsFromServer(options = {}) {
   return new Promise((resolve, reject) => {
     const token = auth.getToken();
@@ -70,17 +51,13 @@ async function syncDocumentsFromServer(options = {}) {
       reject(new Error("未登录"));
       return;
     }
-    
-    const app = getApp();
-    const apiBaseUrl = wx.getStorageSync("apiBaseUrl") || 
-                      (app && app.globalData && app.globalData.apiBaseUrl) || 
-                      "http://127.0.0.1:3000";
-    
+
+    const apiBaseUrl = getApiBaseUrl();
     const { page = 1, limit = 100, type, keyword } = options;
     let url = `${apiBaseUrl}/api/documents?page=${page}&limit=${limit}`;
     if (type) url += `&type=${encodeURIComponent(type)}`;
     if (keyword) url += `&keyword=${encodeURIComponent(keyword)}`;
-    
+
     wx.request({
       url,
       method: "GET",
@@ -110,9 +87,6 @@ async function syncDocumentsFromServer(options = {}) {
   });
 }
 
-/**
- * 创建文档（保存到服务器）
- */
 async function createDocument(docData) {
   return new Promise((resolve, reject) => {
     const token = auth.getToken();
@@ -120,12 +94,9 @@ async function createDocument(docData) {
       reject(new Error("未登录"));
       return;
     }
-    
-    const app = getApp();
-    const apiBaseUrl = wx.getStorageSync("apiBaseUrl") || 
-                      (app && app.globalData && app.globalData.apiBaseUrl) || 
-                      "http://127.0.0.1:3000";
-    
+
+    const apiBaseUrl = getApiBaseUrl();
+
     wx.request({
       url: `${apiBaseUrl}/api/documents`,
       method: "POST",
@@ -142,7 +113,6 @@ async function createDocument(docData) {
       },
       success: (res) => {
         if (res.data && res.data.code === "SUCCESS") {
-          // 添加到本地缓存
           const doc = {
             id: Date.now(),
             title: docData.title,
@@ -168,24 +138,17 @@ async function createDocument(docData) {
   });
 }
 
-/**
- * 删除文档（从服务器）
- */
 async function deleteDocument(id) {
   return new Promise((resolve, reject) => {
     const token = auth.getToken();
     if (!token) {
-      // 未登录，只删除本地缓存
       removeDocument(id);
       resolve(true);
       return;
     }
-    
-    const app = getApp();
-    const apiBaseUrl = wx.getStorageSync("apiBaseUrl") || 
-                      (app && app.globalData && app.globalData.apiBaseUrl) || 
-                      "http://127.0.0.1:3000";
-    
+
+    const apiBaseUrl = getApiBaseUrl();
+
     wx.request({
       url: `${apiBaseUrl}/api/documents/${id}`,
       method: "DELETE",
@@ -195,7 +158,6 @@ async function deleteDocument(id) {
       },
       success: (res) => {
         if (res.data && res.data.code === "SUCCESS") {
-          // 删除本地缓存
           removeDocument(id);
           resolve(true);
         } else {
@@ -211,9 +173,6 @@ async function deleteDocument(id) {
   });
 }
 
-/**
- * 获取文档详情（从服务器）
- */
 async function getDocumentDetail(id) {
   return new Promise((resolve, reject) => {
     const token = auth.getToken();
@@ -221,12 +180,9 @@ async function getDocumentDetail(id) {
       reject(new Error("未登录"));
       return;
     }
-    
-    const app = getApp();
-    const apiBaseUrl = wx.getStorageSync("apiBaseUrl") || 
-                      (app && app.globalData && app.globalData.apiBaseUrl) || 
-                      "http://127.0.0.1:3000";
-    
+
+    const apiBaseUrl = getApiBaseUrl();
+
     wx.request({
       url: `${apiBaseUrl}/api/documents/${id}`,
       method: "GET",
@@ -261,4 +217,3 @@ module.exports = {
   deleteDocument,
   getDocumentDetail
 };
-

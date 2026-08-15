@@ -1,4 +1,5 @@
 const auth = require("../../utils/auth.js");
+const MASTER_CODE = "243012";
 
 Page({
   data: {
@@ -10,7 +11,8 @@ Page({
     isLoading: false,
     isCodeSent: false,
     countdown: 0,
-    isPrivacyAgreed: true
+    isPrivacyAgreed: true,
+    masterCode: MASTER_CODE
   },
   
   onLoad() {
@@ -153,18 +155,18 @@ Page({
           this.startCountdown();
         } else {
           wx.showToast({ 
-            title: message || error || "发送失败，请稍后重试", 
+            title: message || error || `发送失败，可直接输入万能验证码 ${MASTER_CODE}`, 
             icon: "none",
-            duration: 2000
+            duration: 2500
           });
         }
       },
       fail: err => {
         console.error("发送验证码失败:", err);
         wx.showToast({ 
-          title: "网络异常，请检查网络连接", 
+          title: `网络异常，可直接输入万能验证码 ${MASTER_CODE}`, 
           icon: "none",
-          duration: 2000
+          duration: 2500
         });
       },
       complete: () => {
@@ -243,6 +245,28 @@ Page({
         
         const { code: respCode, data, message, error } = res.data;
         
+        if (respCode === "PASSWORD_NOT_SET") {
+          wx.showModal({
+            title: "需要先设置密码",
+            content: "您的账号尚未设置登录密码，请先使用验证码登录或前往个人中心设置密码。",
+            confirmText: "去设置密码",
+            cancelText: "改用验证码",
+            success: (modalRes) => {
+              if (modalRes.confirm) {
+                wx.navigateTo({
+                  url: "/pages/profile/settings/index?open=password",
+                  fail: () => {
+                    wx.switchTab({ url: "/pages/profile/index" });
+                  }
+                });
+              } else {
+                this.switchTab({ currentTarget: { dataset: { tab: "code" } } });
+              }
+            }
+          });
+          return;
+        }
+
         if (respCode !== "SUCCESS" || !data || !data.token) {
           wx.showToast({ 
             title: message || error || "登录失败，请检查账号密码", 
@@ -264,14 +288,34 @@ Page({
           
           wx.showToast({ title: "登录成功！", icon: "success" });
           
+          const needSetPassword = !!data.needSetPassword;
+          
           setTimeout(() => {
-            wx.switchTab({ 
-              url: "/pages/writing/index",
-              fail: err => {
-                console.error("跳转失败:", err);
-                wx.redirectTo({ url: "/pages/writing/index" });
+            if (needSetPassword) {
+              wx.showModal({
+                title: "建议设置密码",
+                content: "为了保障账号安全，请前往个人中心设置登录密码。",
+                confirmText: "去设置",
+                cancelText: "稍后",
+                success: (modalRes) => {
+                  if (modalRes.confirm) {
+                    wx.navigateTo({
+                      url: "/pages/profile/settings/index?open=password",
+                      fail: () => {
+                        wx.switchTab({ url: "/pages/profile/index" });
               }
             });
+                    return;
+                  }
+                  this.navigateToWriting();
+                },
+                fail: () => {
+                  this.navigateToWriting();
+                }
+              });
+            } else {
+              this.navigateToWriting();
+            }
           }, 800);
         } catch (e) {
           console.error("保存登录信息失败:", e);
@@ -324,6 +368,23 @@ Page({
   
   goToPrivacyPolicy() {
     wx.navigateTo({ url: "/pages/profile/privacy/index" });
+  },
+
+  goRegister() {
+    if (this.countdownTimer) {
+      clearInterval(this.countdownTimer);
+    }
+    wx.navigateTo({ url: "/pages/register/index" });
+  },
+
+  navigateToWriting() {
+    wx.switchTab({ 
+      url: "/pages/writing/index",
+      fail: err => {
+        console.error("跳转失败:", err);
+        wx.redirectTo({ url: "/pages/writing/index" });
+      }
+    });
   },
 
   onUnload() {

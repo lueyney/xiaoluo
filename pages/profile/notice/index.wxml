@@ -9,6 +9,18 @@
     <button class="outline-btn" bindtap="markAllRead">全部标记已读</button>
   </view>
 
+  <view class="stats-card">
+    <view class="stats-item">
+      <text class="stats-value">{{stats.unread}}</text>
+      <text class="stats-label">未读通知</text>
+    </view>
+    <view class="stats-divider"></view>
+    <view class="stats-item">
+      <text class="stats-value">{{stats.total}}</text>
+      <text class="stats-label">全部通知</text>
+    </view>
+  </view>
+
   <view class="section-card">
     <text class="section-title">通知渠道</text>
     <view class="setting-item" data-key="app" bindtap="noop">
@@ -34,9 +46,15 @@
     </view>
   </view>
 
+  <view class="chip-group">
+    <block wx:for="{{filterOptions}}" wx:key="value">
+      <view class="chip {{item.value === activeFilter ? 'active' : ''}}" data-value="{{item.value}}" bindtap="onFilterChange">{{item.label}}</view>
+    </block>
+  </view>
+
   <view class="section-card">
     <text class="section-title">最近通知</text>
-    <block wx:for="{{notifications}}" wx:key="id">
+    <block wx:for="{{displayNotifications}}" wx:key="id">
       <view class="notice-item {{item.unread ? 'unread' : ''}}" data-id="{{item.id}}" bindtap="onNoticeTap">
         <view class="notice-meta">
           <text class="notice-tag">{{item.category}}</text>
@@ -46,7 +64,7 @@
         <text class="notice-desc">{{item.desc}}</text>
       </view>
     </block>
-    <view wx:if="{{!notifications.length}}" class="empty-state">
+    <view wx:if="{{!displayNotifications.length}}" class="empty-state">
       <text class="empty-icon">📭</text>
       <text class="empty-text">暂无通知</text>
       <text class="empty-desc">开启通知功能即可收到最新消息</text>

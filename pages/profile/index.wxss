@@ -109,9 +109,10 @@
 .code-label-row{margin-bottom:12rpx}
 .code-label-text{font-size:26rpx;color:#64748b}
 .my-code-display{background:linear-gradient(135deg,#fce7f3 0%,#fbcfe8 100%);border-radius:24rpx;padding:32rpx;margin-bottom:24rpx;text-align:center}
-.my-code-text{font-size:48rpx;font-weight:700;color:#ec4899;letter-spacing:8rpx}
+.my-code-text{font-size:42rpx;font-weight:700;color:#ec4899;letter-spacing:8rpx}
 .my-stats-grid{display:flex;gap:20rpx;margin-bottom:24rpx}
 .stat-card{flex:1;background:#fdf2f8;border-radius:20rpx;padding:20rpx;display:flex;flex-direction:column;align-items:center}
+.stat-card.highlight{background:linear-gradient(135deg,#fce7f3 0%,#fde68a 100%)}
 .stat-number{font-size:36rpx;font-weight:700;color:#ec4899;margin-bottom:6rpx}
 .stat-text{font-size:22rpx;color:#9ca3af}
 .action-buttons{display:flex;gap:16rpx}
@@ -119,4 +120,7 @@
 .action-btn::after{border:none}
 .copy-btn{background:linear-gradient(135deg,#f472b6,#ec4899);color:#ffffff}
 .share-btn{background:linear-gradient(135deg,#0ea5e9,#0284c7);color:#ffffff}
+.claim-btn{width:100%;height:84rpx;line-height:84rpx;margin-top:18rpx;border:none;border-radius:22rpx;background:linear-gradient(135deg,#10b981,#059669);color:#ffffff;font-size:26rpx;font-weight:700;box-shadow:0 10rpx 20rpx rgba(16,185,129,0.22)}
+.claim-btn::after{border:none}
+.claim-btn[disabled]{background:#94a3b8;box-shadow:none}
 .btn-icon{font-size:28rpx}

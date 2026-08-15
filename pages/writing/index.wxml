@@ -44,8 +44,8 @@
         <view class="form-field">
           <view class="field-label-row">
             <text class="field-label">论文题目 *</text>
-            <view class="title-suggest-btn-sm" bindtap="onGenerateTitle">
-              <text class="title-suggest-icon-sm">{{isGeneratingTitle ? '⟳' : '✨'}}</text>
+            <view class="title-suggest-btn-sm {{isGeneratingTitle ? 'loading' : ''}}" bindtap="onGenerateTitle">
+              <text class="title-suggest-icon-sm {{isGeneratingTitle ? 'spin' : ''}}">{{isGeneratingTitle ? '⟳' : '✨'}}</text>
               <text class="title-suggest-text-sm">{{isGeneratingTitle ? '生成中' : 'AI起名'}}</text>
             </view>
           </view>
@@ -58,7 +58,7 @@
         <view class="section-header">
           <text class="section-icon">⚡</text>
           <view class="section-header-text">
-            <view class="section-title">生成内容 *(可多选)</view>
+            <view class="section-title">写作灵感 *(可多选)</view>
             <view class="section-caption">选择需要生成的文档类型</view>
           </view>
         </view>
@@ -85,39 +85,6 @@
           </view>
         </view>
         <view class="setting-card">
-          <view class="setting-item" bindtap="toggleTitleSettings">
-            <view class="setting-left">
-              <view class="setting-icon setting-icon-blue">🎼</view>
-              <view class="setting-texts">
-                <text class="setting-title">标题格式配置</text>
-                <text class="setting-subtitle">自定义多级标题样式</text>
-              </view>
-            </view>
-            <text class="setting-arrow">{{titleSettingsOpen ? '▲' : '▼'}}</text>
-          </view>
-          <view wx:if="{{titleSettingsOpen}}" class="setting-body">
-            <view class="setting-field">
-              <text class="setting-label">一级标题格式</text>
-              <picker mode="selector" range="{{titleLevel1Options}}" value="{{titleLevel1Index}}" bindchange="onSelectTitleLevel1">
-                <view class="setting-picker">
-                  <text>{{titleLevel1Options[titleLevel1Index]}}</text>
-                  <text class="picker-arrow">▼</text>
-                </view>
-              </picker>
-            </view>
-            <view class="setting-field">
-              <text class="setting-label">二级标题格式</text>
-              <picker mode="selector" range="{{titleLevel2Options}}" value="{{titleLevel2Index}}" bindchange="onSelectTitleLevel2">
-                <view class="setting-picker">
-                  <text>{{titleLevel2Options[titleLevel2Index]}}</text>
-                  <text class="picker-arrow">▼</text>
-                </view>
-              </picker>
-            </view>
-          </view>
-        </view>
-
-        <view class="setting-card">
           <view class="setting-item" bindtap="toggleDetailSettings">
             <view class="setting-left">
               <view class="setting-icon setting-icon-green">📝</view>
@@ -134,45 +101,71 @@
         </view>
       </view>
 
-      <view wx:if="{{selectedSummary !== '请选择生成类型'}}" class="summary-card {{isBalanceNotEnough ? 'warn' : ''}}">
-        <view class="summary-card__row">
-          <view class="summary-card__metric">
-            <view class="summary-card__label">预计消耗</view>
-            <view class="summary-card__value cost">{{totalCost}} 积分</view>
+      <view wx:if="{{selectedSummary !== '请选择生成类型'}}" class="summary-card">
+        <view class="summary-main">
+          <view class="summary-block">
+            <text class="summary-label">预计消耗</text>
+            <view class="summary-value">
+              <text class="summary-value-number summary-value--cost">{{totalCost}}</text>
+              <text class="summary-unit">积分</text>
+            </view>
+            <text class="summary-note">{{selectedSummary}}</text>
           </view>
-          <view class="summary-card__metric">
-            <view class="summary-card__label">当前余额</view>
-            <view class="summary-card__value balance">{{credits}} 积分</view>
+          <view class="summary-block summary-block--balance">
+            <text class="summary-label">当前余额</text>
+            <view class="summary-value">
+              <text class="summary-value-number summary-value--balance">{{credits}}</text>
+              <text class="summary-unit">积分</text>
+            </view>
           </view>
         </view>
-        <view class="summary-card__detail">
-          <text class="summary-card__selected">{{selectedSummary}}</text>
-          <text class="summary-card__desc">生成后将自动创建 docx 文档保存到文档库</text>
+
+        <text class="summary-desc">生成后将自动创建 docx 文档保存到文档库</text>
+
+        <view wx:if="{{isBalanceNotEnough}}" class="summary-recharge-card">
+          <view class="summary-recharge-header">
+            <view class="summary-recharge-icon">💡</view>
+            <view class="summary-recharge-texts">
+              <text class="summary-recharge-title">积分余额不足</text>
+              <text class="summary-recharge-tip">还差 {{rechargeShortage}} 积分</text>
+            </view>
+          </view>
+
+          <button class="summary-recharge-btn summary-recharge-btn--first" bindtap="onGoFirstRecharge">
+            🎁 首充特惠，立省50元
+          </button>
+          <button class="summary-recharge-btn summary-recharge-btn--primary" bindtap="onGoRecharge">
+            ⚡ 充1元得50积分
+          </button>
         </view>
       </view>
 
       <view class="generate-action">
         <button class="{{generateBtnClass}}" loading="{{isGenerating}}" disabled="{{generateDisabled}}" bindtap="onGenerate">
-          <text class="generate-icon">{{isGenerating ? '⟳' : (isBalanceNotEnough ? '💰' : '✨')}}</text>
+          <text class="generate-icon {{isGenerating ? 'spin' : ''}}">{{isGenerating ? '⟳' : (isBalanceNotEnough ? '💰' : '✨')}}</text>
           <text class="generate-text">{{generateButtonText}}</text>
           <text wx:if="{{!isGenerating && !isBalanceNotEnough}}" class="generate-arrow">→</text>
         </button>
       </view>
 
       <view class="tips-panel">
-        <text class="tip-item">生成的内容仅供参考，请务必进行人工审核和修改</text>
-        <text class="tip-item">论文君遵守学术规范，生成内容原创性高</text>
-        <text class="tip-item">如有疑问请联系客服或查看帮助文档</text>
+        <view class="tip-item">
+          <text>本内容由AI大模型辅助生成，仅供写作灵感参考。</text>
+        </view>
+        <view class="tip-item">
+          <text>AI生成内容可能存在事实错误，请务必进行人工核实与修改。</text>
+        </view>
+        <view class="tip-item">
+          <text>严禁将生成内容直接作为学术成果提交，请遵守学术规范。</text>
+        </view>
+        <view class="tip-item">
+          <text>本工具致力于提升写作效率，坚决抵制学术不端行为。</text>
+        </view>
       </view>
 
       <view wx:if="{{generatedContent}}" class="result-card">
         <view class="result-content">
           <text class="result-text">{{generatedContent}}</text>
-        </view>
-        <view class="result-actions">
-          <button class="outline-btn" bindtap="onSaveContent">💾 保存文档</button>
-          <button class="outline-btn" bindtap="noop">📤 导出</button>
-          <button class="primary-btn" bindtap="noop">🔄 继续优化</button>
         </view>
       </view>
     </view>

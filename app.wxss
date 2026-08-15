@@ -1,1 +1,3 @@
-@import "app-origin.wxss";
+page, view, text, button {
+  box-sizing: border-box;
+}

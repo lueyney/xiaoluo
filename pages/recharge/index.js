@@ -1,17 +1,12 @@
 const auth = require("../../utils/auth.js");
 const points = require("../../utils/points.js");
+const { getApiBaseUrl } = require("../../utils/request.js");
 
 Page({
   data: {
     credits: 0,
-    rechargePackages: [
-      { id: 1, credits: 1, price: 1, bonus: 0, label: "体验套餐", recommended: false, isFirstTime: false },
-      { id: 2, credits: 10, price: 10, bonus: 0, label: "可生成任务书", recommended: false, isFirstTime: false },
-      { id: 3, credits: 20, price: 20, bonus: 0, label: "可生成开题报告", recommended: false, isFirstTime: false },
-      { id: 4, credits: 50, price: 50, bonus: 0, label: "热门套餐", recommended: true, isFirstTime: false },
-      { id: 5, credits: 100, price: 100, bonus: 0, label: "豪华套餐", recommended: false, isFirstTime: false }
-    ],
-    firstTimePackage: { id: 0, credits: 50, price: 1, bonus: 49, label: "首充特惠", recommended: true, isFirstTime: true },
+    rechargePackages: [],
+    firstTimePackage: null,
     hasFirstRecharge: false,
     selectedPackage: null,
     isLoading: true,
@@ -38,31 +33,86 @@ Page({
   },
   
   initPage() {
-    // 显示loading
     this.setData({ isLoading: true });
-    
-    // 先加载本地数据
     this.loadCredits();
-    
-    // 异步检查首充状态（不阻塞页面）
+    this.loadRechargePackages();
     this.checkFirstRecharge();
-    
-    // 页面加载完成
     this.setData({ isLoading: false });
+  },
+
+  loadRechargePackages() {
+    const token = auth.getToken();
+    const apiBaseUrl = getApiBaseUrl();
+
+    if (!token) {
+      return;
+    }
+
+    wx.request({
+      url: `${apiBaseUrl}/api/orders/packages`,
+      method: "GET",
+      header: {
+        "Authorization": `Bearer ${token}`
+      },
+      success: (res) => {
+        if (!(res.data && res.data.code === "SUCCESS" && Array.isArray(res.data.data))) {
+          return;
+        }
+
+        const packages = res.data.data;
+        const firstTimePackage = packages.find(item => Number(item.price) === 0) || null;
+        const rechargePackages = packages.filter(item => Number(item.price) > 0).map(item => ({
+          id: item.id,
+          credits: item.credits,
+          price: item.price,
+          bonus: 0,
+          label: item.description || item.name,
+          recommended: !!item.popular,
+          isFirstTime: false,
+          name: item.name,
+          description: item.description || ''
+        }));
+
+        this.setData({
+          rechargePackages,
+          firstTimePackage: firstTimePackage ? {
+            id: firstTimePackage.id,
+            credits: firstTimePackage.credits,
+            price: firstTimePackage.price,
+            bonus: 0,
+            label: firstTimePackage.name,
+            recommended: !!firstTimePackage.popular,
+            isFirstTime: true,
+            name: firstTimePackage.name,
+            description: firstTimePackage.description || ''
+          } : null
+        });
+      },
+      fail: (err) => {
+        console.error("加载充值套餐失败:", err);
+      }
+    });
   },
 
   loadCredits() {
     const credits = points.getCredits();
     this.setData({ credits });
+
+    if (auth.getToken()) {
+      points
+        .syncCreditsFromServer()
+        .then((fresh) => {
+          this.setData({ credits: fresh });
+        })
+        .catch((err) => {
+          console.error("同步积分失败:", err);
+        });
+    }
   },
 
-  // 检查是否已经首充
   checkFirstRecharge() {
     const token = auth.getToken();
-    const app = getApp();
-    const apiBaseUrl = wx.getStorageSync("apiBaseUrl") || 
-                      (app && app.globalData && app.globalData.apiBaseUrl) || 
-                      "http://127.0.0.1:3000";
+    const apiBaseUrl = getApiBaseUrl();
 
     wx.request({
       url: `${apiBaseUrl}/api/wechat-pay/check-first-recharge`,
@@ -88,13 +138,13 @@ Page({
   },
 
   selectPackage(e) {
-    const packageId = e.currentTarget.dataset.id;
-    const isFirstTime = e.currentTarget.dataset.firsttime;
+    const packageId = Number(e.currentTarget.dataset.id);
+    const isFirstTime = !!e.currentTarget.dataset.firsttime;
     
     if (isFirstTime) {
       this.selectRecommendPackage();
     } else {
-      const selected = this.data.rechargePackages.find(p => p.id === packageId);
+      const selected = this.data.rechargePackages.find(p => Number(p.id) === packageId);
       if (selected) {
         this.processPayment(selected);
       }
@@ -132,10 +182,7 @@ Page({
   // 创建支付订单
   createPaymentOrder(pkg, code) {
     const token = auth.getToken();
-    const app = getApp();
-    const apiBaseUrl = wx.getStorageSync("apiBaseUrl") || 
-                      (app && app.globalData && app.globalData.apiBaseUrl) || 
-                      "http://127.0.0.1:3000";
+    const apiBaseUrl = getApiBaseUrl();
 
     wx.showLoading({ title: '正在创建订单...' });
 
@@ -150,7 +197,7 @@ Page({
         code: code,  // 传递code给后端
         packageId: pkg.id,
         amount: pkg.price,
-        credits: pkg.credits + pkg.bonus,
+        credits: pkg.credits,
         isFirstTime: pkg.isFirstTime || false
       },
       success: (res) => {
@@ -163,8 +210,9 @@ Page({
           console.log('订单创建成功:', orderId);
           console.log('支付参数:', payParams);
           
-          // 调用微信支付
-          if (payParams && !payParams.mock) {
+          if (payParams && payParams.free) {
+            this.requestWeChatPayment(payParams, orderId, pkg);
+          } else if (payParams && !payParams.mock) {
             this.requestWeChatPayment(payParams, orderId, pkg);
           } else {
             wx.showModal({
@@ -203,6 +251,13 @@ Page({
   // 调用微信支付
   requestWeChatPayment(payParams, orderId, pkg) {
     console.log('拉起微信支付:', payParams);
+
+    if (payParams && payParams.free) {
+      wx.showToast({ title: '领取成功', icon: 'success', duration: 2000 });
+      this.loadCredits();
+      this.checkFirstRecharge();
+      return;
+    }
     
     wx.requestPayment({
       timeStamp: payParams.timeStamp,
@@ -211,45 +266,20 @@ Page({
       signType: payParams.signType,
       paySign: payParams.paySign,
       success: (res) => {
-        // 支付成功（注意：这只是前端成功，不代表最终到账）
+        // ✅ 支付成功，不要等！立刻去后端查
         console.log('微信支付成功:', res);
-        wx.showToast({ 
-          title: '支付成功，处理中...', 
-          icon: 'success',
-          duration: 2000
-        });
-        
-        // 等待3秒后刷新积分（等待微信回调处理）
-        setTimeout(() => {
-          this.loadCredits();
-          this.checkFirstRecharge();
-        }, 3000);
+        this.checkPaymentStatus(orderId);
       },
       fail: (err) => {
         console.error("支付失败:", err);
         
         // 详细的错误提示
         if (err.errMsg === 'requestPayment:fail cancel') {
-          wx.showModal({
-            title: '支付已取消',
-            content: '您已取消本次支付，可以重新选择套餐充值',
-            showCancel: false,
-            confirmText: '我知道了'
-          });
+          wx.showToast({ title: '支付已取消', icon: 'none' });
         } else if (err.errMsg.includes('参数错误')) {
-          wx.showModal({
-            title: '支付失败',
-            content: '支付参数错误，请联系客服',
-            showCancel: false,
-            confirmText: '确定'
-          });
+          wx.showToast({ title: '支付失败', icon: 'none' });
         } else {
-          wx.showModal({
-            title: '支付失败',
-            content: err.errMsg || '支付过程中出现错误，请稍后重试',
-            showCancel: false,
-            confirmText: '确定'
-          });
+          wx.showToast({ title: '支付失败', icon: 'none' });
         }
       }
     });
@@ -277,6 +307,95 @@ Page({
   // 跳转到支付记录页面
   goToPaymentRecords() {
     wx.navigateTo({ url: "/pages/payment-records/index" });
+  },
+
+  // 主动查询支付结果并更新积分（支付成功后立即调用）
+  checkPaymentStatus(orderId) {
+    const token = auth.getToken();
+    const apiBaseUrl = getApiBaseUrl();
+
+    // 立即显示 loading，防止用户乱点
+    wx.showLoading({ title: '确认中...', mask: true });
+
+    wx.request({
+      url: `${apiBaseUrl}/api/wechat-pay/poll-order/${orderId}`,
+      method: "GET",
+      header: {
+        "Authorization": `Bearer ${token}`
+      },
+      success: (res) => {
+        wx.hideLoading();
+
+        if (res.data && res.data.code === "SUCCESS") {
+          // ✅ 验证成功，积分已发放
+          const credits = res.data.data.credits || 0;
+          const balance = res.data.data.balance;
+          
+          // 1. 提示成功
+          wx.showToast({ 
+            title: '充值成功', 
+            icon: 'success',
+            duration: 2000
+          });
+          
+          // 2. 更新本地显示的积分（使用后端返回的最新余额）
+          if (typeof balance === 'number') {
+            points.setCredits(balance);
+            this.setData({ credits: balance });
+          } else {
+            // 如果没有返回余额，重新拉取
+            this.loadCredits();
+          }
+          
+          // 3. 刷新首充状态
+          this.checkFirstRecharge();
+        } else if (res.data && res.data.code === "ORDER_NOT_PAID") {
+          // 极少见情况：微信那边还没显示支付成功（通常稍等重试即可）
+          wx.showToast({ 
+            title: '系统处理中，请稍后查看', 
+            icon: 'none',
+            duration: 2000
+          });
+          
+          // 兜底：延迟刷新积分（等待回调）
+          setTimeout(() => {
+            this.loadCredits();
+            this.checkFirstRecharge();
+          }, 2000);
+        } else {
+          // 其他错误
+          const errorMsg = res.data.error || res.data.message || "验证失败";
+          wx.showToast({ 
+            title: '结果同步中，请刷新查看', 
+            icon: 'none',
+            duration: 2000
+          });
+          
+          // 兜底：延迟刷新积分（等待回调）
+          setTimeout(() => {
+            this.loadCredits();
+            this.checkFirstRecharge();
+          }, 2000);
+        }
+      },
+      fail: (err) => {
+        wx.hideLoading();
+        console.error("查单失败:", err);
+        
+        // 查单接口挂了不代表支付挂了，提示用户稍后看
+        wx.showToast({ 
+          title: '结果同步中，请刷新查看', 
+          icon: 'none',
+          duration: 2000
+        });
+        
+        // 兜底：延迟刷新积分（等待回调）
+        setTimeout(() => {
+          this.loadCredits();
+          this.checkFirstRecharge();
+        }, 2000);
+      }
+    });
   }
 });
 

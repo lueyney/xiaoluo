@@ -14,9 +14,10 @@ Page({
     isLoading: false,
     showPhoneLoginModal: false
   },
-  documentTypes: ["全部", "学术论文", "开题报告", "任务书", "文献综述", "答辩稿", "中期检查表", "答辩PPT"],
+  documentTypes: ["全部", "学术范文", "开题报告", "任务书", "文献综述", "答辩稿", "中期检查表", "答辩PPT"],
   colorMap: {
-    "学术论文": "#2563eb",
+    "学术范文": "#2563eb",
+    "学术论文": "#2563eb", // 兼容历史数据
     "开题报告": "#7c3aed",
     "任务书": "#dc2626",
     "文献综述": "#059669",
@@ -59,7 +60,7 @@ Page({
       const processedDocs = cachedDocs.map((doc, index) => {
         const content = doc.content || "";
         const preview = content.length > 120 ? content.substring(0, 120) + "..." : content;
-        const type = doc.type || "学术论文";
+        const type = doc.type || "学术范文";
         const color = this.colorMap[type] || "#6b7280";
         return Object.assign({}, doc, {
           id: doc.id || Date.now() + index,
@@ -88,7 +89,7 @@ Page({
         const docs = (result.documents || []).map((doc, index) => {
           const content = doc.content || "";
           const preview = content.length > 120 ? content.substring(0, 120) + "..." : content;
-          const type = doc.type || "学术论文";
+          const type = doc.type || "学术范文";
           const color = this.colorMap[type] || "#6b7280";
           return Object.assign({}, doc, {
             id: doc.id || Date.now() + index,
@@ -258,7 +259,7 @@ Page({
     const doc = id !== undefined
       ? this.data.documents.find(item => item.id === id) || this.data.filteredDocs.find(item => item.id === id)
       : null;
-
+    
     if (!doc || !doc.content) {
       wx.showToast({ title: "内容为空", icon: "none" });
       return;

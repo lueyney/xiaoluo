@@ -8,7 +8,14 @@ Page({
       mail: true,
       sms: false
     },
-    notifications: []
+    notifications: [],
+    displayNotifications: [],
+    filterOptions: [{ label: "全部", value: "all" }],
+    activeFilter: "all",
+    stats: {
+      total: 0,
+      unread: 0
+    }
   },
   onShow() {
     wx.setNavigationBarTitle({ title: "消息通知" });
@@ -17,7 +24,18 @@ Page({
   },
   loadNotifications() {
     const list = notificationsUtil.getNotifications();
-    this.setData({ notifications: list });
+    const filters = this.buildFilters(list);
+    const stats = {
+      total: list.length,
+      unread: list.filter(item => item.unread).length
+    };
+    this.setData({
+      notifications: list,
+      filterOptions: filters,
+      stats
+    }, () => {
+      this.applyFilter(this.data.activeFilter);
+    });
   },
   onToggleGlobal(e) {
     const value = !!e.detail.value;
@@ -41,6 +59,27 @@ Page({
     notificationsUtil.markRead(id);
     this.loadNotifications();
     this.updateProfileBadge();
+  },
+  buildFilters(list) {
+    const unique = Array.from(new Set(list.map(item => item.category))).filter(Boolean);
+    const chips = [{ label: "全部", value: "all" }];
+    unique.forEach(label => {
+      chips.push({ label, value: label });
+    });
+    return chips;
+  },
+  applyFilter(value = "all") {
+    const filtered = value === "all"
+      ? this.data.notifications
+      : this.data.notifications.filter(item => item.category === value);
+    this.setData({
+      activeFilter: value,
+      displayNotifications: filtered
+    });
+  },
+  onFilterChange(e) {
+    const value = e.currentTarget.dataset.value;
+    this.applyFilter(value);
   },
   updateProfileBadge() {
     const unread = notificationsUtil.hasUnread();

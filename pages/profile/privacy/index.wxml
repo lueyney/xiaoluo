@@ -3,8 +3,14 @@
     <text class="hero-title">隐私与安全</text>
     <text class="hero-subtitle">我们重视您的数据安全与使用隐私</text>
     <view class="security-status">
-      <text class="status-label">安全状态</text>
-      <text class="status-value">高</text>
+      <view class="status-score">
+        <text class="status-number">98</text>
+        <text class="status-unit">/100</text>
+      </view>
+      <view class="status-bars">
+        <view class="status-bar-fill"></view>
+      </view>
+      <text class="status-tip">风险极低</text>
     </view>
   </view>
 
@@ -35,9 +41,11 @@
 
   <view class="section-card">
     <text class="section-title">数据操作</text>
-    <view class="action-row">
+    <view class="action-grid">
       <button class="outline-btn" data-type="download" bindtap="onClickAction">下载数据</button>
       <button class="outline-btn" data-type="delete" bindtap="onClickAction">删除记录</button>
+      <button class="outline-btn" data-type="history" bindtap="onClickAction">查看审计</button>
+      <button class="outline-btn" data-type="policy" bindtap="onClickAction">隐私政策</button>
     </view>
     <button class="primary-btn" data-type="contact" bindtap="onClickAction">联系隐私专员</button>
   </view>

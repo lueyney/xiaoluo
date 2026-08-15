@@ -2,6 +2,66 @@ const points = require("../../utils/points.js");
 const notifications = require("../../utils/notifications.js");
 const docNotifications = require("../../utils/doc-notifications.js");
 const auth = require("../../utils/auth.js");
+const { request } = require("../../utils/request.js");
+
+const DEFAULT_FIELD_PLACEHOLDER = "请选择学科领域";
+const FIELD_OPTIONS = [
+  DEFAULT_FIELD_PLACEHOLDER,
+  "哲学",
+  "理论经济学",
+  "应用经济学",
+  "法学",
+  "政治学",
+  "社会学",
+  "民族学",
+  "马克思主义理论",
+  "教育学",
+  "心理学",
+  "体育学",
+  "文学",
+  "中国语言文学",
+  "外国语言文学",
+  "新闻传播学",
+  "化学",
+  "天文学",
+  "地理学",
+  "生态学",
+  "统计学",
+  "力学",
+  "机械工程",
+  "材料科学与工程",
+  "电气工程",
+  "电子科学与技术",
+  "信息与通信工程",
+  "控制科学与工程",
+  "计算机科学与技术",
+  "化学工程与技术",
+  "纺织科学与工程",
+  "轻工技术与工程",
+  "交通运输工程",
+  "兵器科学与技术",
+  "农业工程",
+  "林业工程",
+  "环境科学与工程",
+  "生物医学工程",
+  "食品科学与工程",
+  "城乡规划学",
+  "风景园林学",
+  "软件工程",
+  "农学",
+  "林学",
+  "医学",
+  "药学",
+  "护理学",
+  "工商管理",
+  "农林经济管理",
+  "公共管理",
+  "图书情报与档案管理",
+  "设计学",
+  "其他"
+];
+
+const SEARCH_DEBOUNCE_DELAY = 120;
 
 Page({
   data: {
@@ -13,97 +73,23 @@ Page({
     generatedTitles: [],
     showFieldSelector: false,
     fieldSearchText: "",
-    filteredFields: [],
+    filteredFields: FIELD_OPTIONS.filter(field => field !== DEFAULT_FIELD_PLACEHOLDER),
     shouldFocusSearch: false,
     hasSearchText: false,
     showCustomOption: false,
     showPhoneLoginModal: false,
-    fields: [
-      "请选择学科领域",
-      "哲学",
-      "理论经济学",
-      "应用经济学",
-      "法学",
-      "政治学",
-      "社会学",
-      "民族学",
-      "马克思主义理论",
-      "教育学",
-      "心理学",
-      "体育学",
-      "文学",
-      "中国语言文学",
-      "外国语言文学",
-      "新闻传播学",
-      "化学",
-      "天文学",
-      "地理学",
-      "生态学",
-      "统计学",
-      "力学",
-      "机械工程",
-      "材料科学与工程",
-      "电气工程",
-      "电子科学与技术",
-      "信息与通信工程",
-      "控制科学与工程",
-      "计算机科学与技术",
-      "化学工程与技术",
-      "纺织科学与工程",
-      "轻工技术与工程",
-      "交通运输工程",
-      "兵器科学与技术",
-      "农业工程",
-      "林业工程",
-      "环境科学与工程",
-      "生物医学工程",
-      "食品科学与工程",
-      "城乡规划学",
-      "风景园林学",
-      "软件工程",
-      "农学",
-      "林学",
-      "医学",
-      "药学",
-      "护理学",
-      "工商管理",
-      "农林经济管理",
-      "公共管理",
-      "图书情报与档案管理",
-      "设计学",
-      "其他"
-    ],
+    fields: FIELD_OPTIONS,
     fieldIndex: 0,
     contentTypes: [
-      { icon: "📝", label: "学术论文", value: "学术论文", description: "完整的学术研究论文", credits: 75, selected: false },
+      { icon: "📝", label: "学术范文", value: "学术范文", description: "完整的学术研究论文", credits: 75, selected: false },
       { icon: "📄", label: "开题报告", value: "开题报告", description: "研究计划和方法说明", credits: 25, selected: false },
       { icon: "🛠️", label: "任务书", value: "任务书", description: "项目任务安排文档", credits: 20, selected: false },
       { icon: "📚", label: "文献综述", value: "文献综述", description: "多篇文献综述整合", credits: 35, selected: false },
       { icon: "🎤", label: "答辩稿", value: "答辩稿", description: "答辩演讲稿撰写", credits: 5, selected: false },
-      { icon: "📎", label: "中期检查表", value: "中期检查表", description: "研究进度检查记录", credits: 10, selected: false },
-      { icon: "📊", label: "答辩PPT", value: "答辩PPT", description: "答辩演示文稿", credits: 25, selected: false }
+      { icon: "📎", label: "中期检查表", value: "中期检查表", description: "研究进度检查记录", credits: 10, selected: false }
     ],
     requirements: "",
-    titleSettingsOpen: true,
     detailSettingsOpen: false,
-    titleLevel1Options: [
-      "请选择一级标题格式",
-      "一、罗马数字 (I、II、III)",
-      "一、中文数字 (一、二、三)",
-      "1. 阿拉伯数字 (1、2、3)",
-      "章节标题 (第一章、第二章)",
-      "无编号自定义"
-    ],
-    titleLevel2Options: [
-      "请选择二级标题格式",
-      "(一) 中文序号",
-      "(1) 阿拉伯数字",
-      "1.1 章节编号",
-      "A. 字母序列",
-      "无编号自定义"
-    ],
-    titleLevel1Index: 0,
-    titleLevel2Index: 0,
     selectedSummary: "请选择生成类型",
     totalCost: 0,
     isBalanceNotEnough: false,
@@ -111,7 +97,17 @@ Page({
     generateDisabled: true,
     generateButtonText: "开始AI生成",
     generateBtnClass: "generate-btn generate-btn-disabled",
-    credits: 0
+    credits: 0,
+    isGeneratingTitle: false,
+    rechargeShortage: 0
+  },
+  onLoad() {
+    this.allFields = FIELD_OPTIONS.filter(field => field !== DEFAULT_FIELD_PLACEHOLDER);
+  },
+  onUnload() {
+    if (typeof this.clearFieldFilterTimer === 'function') {
+      this.clearFieldFilterTimer();
+    }
   },
   onShow() {
     wx.setNavigationBarTitle({ title: "AI智能创作" });
@@ -157,8 +153,9 @@ Page({
     wx.switchTab({ url: "/pages/library/index" });
   },
   openFieldSelector() {
-    const allFields = this.data.fields.filter(f => f !== "请选择学科领域");
-    // 优化：一次性设置所有数据，避免多次渲染
+    this.clearFieldFilterTimer();
+    const allFields = this.allFields || FIELD_OPTIONS.filter(field => field !== DEFAULT_FIELD_PLACEHOLDER);
+    this.allFields = allFields;
     this.setData({ 
       showFieldSelector: true,
       filteredFields: allFields,
@@ -167,9 +164,13 @@ Page({
       hasSearchText: false,
       showCustomOption: false
     });
+    wx.nextTick(() => {
+      this.setData({ shouldFocusSearch: true });
+    });
   },
   
   closeFieldSelector() {
+    this.clearFieldFilterTimer();
     this.setData({ 
       showFieldSelector: false,
       fieldSearchText: "",
@@ -180,13 +181,14 @@ Page({
   },
   
   onFieldSearch(e) {
-    const searchText = e.detail.value;
-    const allFields = this.data.fields.filter(f => f !== "请选择学科领域");
-    
+    const searchText = (e.detail.value || "").toString();
     const trimmedText = searchText.trim();
-    const hasText = trimmedText.length > 0;
-    
-    if (!hasText) {
+    const allFields = this.allFields || FIELD_OPTIONS.filter(field => field !== DEFAULT_FIELD_PLACEHOLDER);
+    this.allFields = allFields;
+
+    this.clearFieldFilterTimer();
+
+    if (!trimmedText) {
       this.setData({ 
         fieldSearchText: searchText,
         filteredFields: allFields,
@@ -195,26 +197,46 @@ Page({
       });
       return;
     }
-    
-    const filtered = allFields.filter(field => field.includes(searchText));
-    const showCustom = hasText && filtered.length === 0;
-    
-    this.setData({ 
+
+    this.setData({
       fieldSearchText: searchText,
+      hasSearchText: true
+    });
+
+    this.fieldFilterTimer = setTimeout(() => {
+      this.applyFieldFilter(trimmedText);
+    }, SEARCH_DEBOUNCE_DELAY);
+  },
+  applyFieldFilter(searchText) {
+    const lowerKeyword = searchText.toLowerCase();
+    const allFields = this.allFields || FIELD_OPTIONS.filter(field => field !== DEFAULT_FIELD_PLACEHOLDER);
+    this.allFields = allFields;
+    const filtered = allFields.filter(field => field.toLowerCase().includes(lowerKeyword));
+    const hasText = searchText.length > 0;
+    this.setData({
       filteredFields: filtered,
       hasSearchText: hasText,
-      showCustomOption: showCustom
+      showCustomOption: hasText && filtered.length === 0
     });
+    this.fieldFilterTimer = null;
+  },
+  clearFieldFilterTimer() {
+    if (this.fieldFilterTimer) {
+      clearTimeout(this.fieldFilterTimer);
+      this.fieldFilterTimer = null;
+    }
   },
   
   selectField(e) {
     const field = e.currentTarget.dataset.field;
-    
+    this.clearFieldFilterTimer();
     this.setData({ 
       "formData.field": field,
       showFieldSelector: false,
       fieldSearchText: "",
       shouldFocusSearch: false,
+      hasSearchText: false,
+      showCustomOption: false,
       generatedTitles: []
     });
     
@@ -233,12 +255,14 @@ Page({
       wx.showToast({ title: "请输入学科名称", icon: "none", duration: 2000 });
       return;
     }
-    
+    this.clearFieldFilterTimer();
     this.setData({ 
       "formData.field": customField,
       showFieldSelector: false,
       fieldSearchText: "",
       shouldFocusSearch: false,
+      hasSearchText: false,
+      showCustomOption: false,
       generatedTitles: []
     });
     
@@ -258,11 +282,6 @@ Page({
     this.setData({ requirements: e.detail.value });
   },
   onGenerateTitle() {
-    // 检查登录状态
-    if (!auth.requireLogin(true)) {
-      return;
-    }
-    
     if (!this.data.formData.field) {
       wx.showToast({ title: "请先选择学科领域", icon: "none" });
       return;
@@ -271,22 +290,16 @@ Page({
     
     this.setData({ isGeneratingTitle: true });
     
-    const app = getApp();
-    const apiBaseUrl = wx.getStorageSync("apiBaseUrl") || app.globalData.apiBaseUrl || "http://127.0.0.1:3000";
-    const token = auth.getToken();
-    
-    wx.request({
-      url: `${apiBaseUrl}/api/title-generator/generate`,
+    request({
+      url: "/api/title-generator/generate",
       method: "POST",
-      header: {
-        "Content-Type": "application/json",
-        "Authorization": `Bearer ${token}`
-      },
       data: { 
         field: this.data.formData.field,
         excludeTitles: this.data.generatedTitles
       },
-      success: (res) => {
+      showLoading: true,
+      loadingText: "AI取名中..."
+    }).then((res) => {
         if (res.statusCode === 200 && res.data && res.data.code === 'SUCCESS') {
           const title = res.data.data.title;
           
@@ -300,46 +313,42 @@ Page({
           
           this.setData({ 
             "formData.topic": title,
-            generatedTitles: newTitles,
-            isGeneratingTitle: false 
+          generatedTitles: newTitles
           });
-      this.updateSummary();
+          this.updateSummary();
           wx.showToast({ title: "AI生成完成", icon: "success" });
         } else {
-          this.setData({ isGeneratingTitle: false });
           wx.showToast({ title: "生成失败，请重试", icon: "none", duration: 2000 });
         }
-      },
-      fail: (err) => {
-        this.setData({ isGeneratingTitle: false });
+    }).catch((err) => {
+      if (err && err.statusCode === 401) {
+        wx.showToast({ title: "需要登录后才能继续使用高级功能", icon: "none" });
+      } else {
         wx.showToast({ title: "网络错误，请重试", icon: "none", duration: 2000 });
       }
+    }).finally(() => {
+      this.setData({ isGeneratingTitle: false });
     });
   },
   toggleContentType(e) {
+    if (!auth.requireLogin(true)) {
+      return;
+    }
     const value = e.currentTarget.dataset.value;
     const types = this.data.contentTypes.map(item => item.value === value ? Object.assign({}, item, { selected: !item.selected }) : item);
     const selected = types.filter(item => item.selected).map(item => item.value);
     this.setData({ contentTypes: types, "formData.contentTypes": selected });
     this.updateSummary();
   },
-  toggleTitleSettings() {
-    this.setData({ titleSettingsOpen: !this.data.titleSettingsOpen });
-  },
   toggleDetailSettings() {
     this.setData({ detailSettingsOpen: !this.data.detailSettingsOpen });
-  },
-  onSelectTitleLevel1(e) {
-    this.setData({ titleLevel1Index: Number(e.detail.value) });
-  },
-  onSelectTitleLevel2(e) {
-    this.setData({ titleLevel2Index: Number(e.detail.value) });
   },
   updateSummary() {
     const selected = this.data.contentTypes.filter(item => item.selected);
     const totalCost = selected.reduce((sum, item) => sum + item.credits, 0);
     const credits = points.getCredits();
     const isBalanceNotEnough = totalCost > credits;
+    const rechargeShortage = Math.max(totalCost - credits, 0);
     const selectedSummary = selected.length ? "已选择：" + selected.map(item => item.label).join("、") : "请选择生成类型";
     const ready = this.data.formData.field && this.data.formData.topic && selected.length && !isBalanceNotEnough;
     const generateState = this.data.isGenerating ? "loading" : (ready ? "active" : "pending");
@@ -357,7 +366,25 @@ Page({
       generateDisabled,
       generateButtonText,
       generateBtnClass: this.computeBtnClass(generateDisabled, isBalanceNotEnough),
-      credits
+      credits,
+      rechargeShortage
+    });
+  },
+  onGoFirstRecharge() {
+    this.navigateToRecharge();
+  },
+  onGoRecharge() {
+    this.navigateToRecharge();
+  },
+  navigateToRecharge() {
+    if (!auth.requireLogin(true)) {
+      return;
+    }
+    wx.navigateTo({
+      url: "/pages/recharge/index",
+      fail: () => {
+        wx.switchTab({ url: "/pages/profile/index" });
+      }
     });
   },
   computeBtnClass(disabled, notEnough) {
@@ -389,7 +416,7 @@ Page({
     if (this.data.isBalanceNotEnough) {
       wx.showModal({
         title: "积分不足",
-        content: `当前积分：${this.data.credits}\n所需积分：${this.data.totalCost}\n\n请先充值后再生成论文`,
+        content: `当前积分：${this.data.credits}\n所需积分：${this.data.totalCost}\n\n首充仅需1元即可获得50积分，是否前往充值？`,
         showCancel: true,
         cancelText: "取消",
         confirmText: "去充值",
@@ -406,17 +433,37 @@ Page({
       });
       return;
     }
+
+    // 显示确认弹窗，让用户确认是否生成
+    const selectedTypes = this.data.contentTypes.filter(item => item.selected);
+    const expectedCredits = selectedTypes.reduce((sum, item) => sum + item.credits, 0);
+    const typeNames = selectedTypes.map(item => item.label).join('、');
+    
+    wx.showModal({
+      title: "确认生成",
+      content: `确定要生成以下内容吗？\n\n📝 题目：${topic}\n📚 类型：${typeNames}\n💰 消耗积分：${this.data.totalCost}\n\n生成后将自动保存到文档库`,
+      showCancel: true,
+      cancelText: "取消",
+      confirmText: "确定生成",
+      success: (res) => {
+        if (res.confirm) {
+          // 用户确认后，开始生成
+          this.startGeneration();
+        }
+      }
+    });
+  },
+
+  // 开始生成（实际调用API）
+  startGeneration() {
+    const { field, topic, contentTypes } = this.data.formData;
+    
     this.setData({ isGenerating: true });
     this.updateSummary();
     
     // 不使用 wx.showLoading，避免遮罩问题
     // 用户可以通过页面状态看到"正在生成中"
     
-    const app = getApp();
-    const apiBaseUrl = wx.getStorageSync("apiBaseUrl") || 
-                      (app && app.globalData && app.globalData.apiBaseUrl) || 
-                      "http://127.0.0.1:3000";
-    const token = auth.getToken();
     const selectedTypes = this.data.contentTypes.filter(item => item.selected);
     const expectedCredits = selectedTypes.reduce((sum, item) => sum + item.credits, 0);
     
@@ -428,20 +475,16 @@ Page({
       expectedCredits: expectedCredits
     });
     
-    wx.request({
-      url: `${apiBaseUrl}/api/coze/generate`,
+    request({
+      url: "/api/coze/generate",
       method: "POST",
-      header: {
-        "Content-Type": "application/json",
-        "Authorization": `Bearer ${token}`
-      },
       data: {
         topic: topic,
         field: field || "教育学",
         contentTypes: contentTypes,
         expectedCredits: expectedCredits
-      },
-      success: (res) => {
+      }
+    }).then((res) => {
         if (res.data && res.data.code === "PROCESSING") {
           const docCount = contentTypes.length;
           const estimatedMinutes = Math.ceil(docCount * 0.5);
@@ -496,15 +539,17 @@ Page({
           });
           this.setData({ isGenerating: false });
         }
-      },
-      fail: (err) => {
+    }).catch((err) => {
+      if (err && err.statusCode === 401) {
+        wx.showToast({ title: "请重新登录后再生成内容", icon: "none" });
+      } else {
         wx.showToast({ 
           title: "网络异常，请稍后重试", 
           icon: "none" 
         });
-        this.setData({ isGenerating: false });
-        this.updateSummary();
       }
+      this.setData({ isGenerating: false });
+      this.updateSummary();
     });
   },
   
@@ -535,22 +580,12 @@ Page({
       return;
     }
     
-    const app = getApp();
-    const apiBaseUrl = wx.getStorageSync("apiBaseUrl") || 
-                      (app && app.globalData && app.globalData.apiBaseUrl) || 
-                      "http://127.0.0.1:3000";
-    const token = auth.getToken();
-    
     setTimeout(() => {
-      wx.request({
-        url: `${apiBaseUrl}/api/orders/${orderId}`,
+      request({
+        url: `/api/orders/${orderId}`,
         method: "GET",
-        header: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${token}`
-        },
-        timeout: 30000,
-        success: (res) => {
+        timeout: 30000
+      }).then((res) => {
           if (res.statusCode === 200 && res.data) {
             let order = null;
             if (res.data.data) {
@@ -595,13 +630,23 @@ Page({
                 text: docCount > 9 ? '9+' : String(docCount)
               });
               
-              // 显示成功提示（使用modal避免被遮挡）
+              // 仅弹窗提示一次：使用本地缓存记录已提示过的订单ID
+              try {
+                const notified = wx.getStorageSync('generationSuccessNotified') || {};
+                if (!notified[orderId]) {
               wx.showModal({
                 title: '生成成功',
                 content: `${docCount > 1 ? `${docCount}个文档` : '文档'}已生成完成\n\n已保存到【文档库】，可前往查看`,
                 showCancel: false,
                 confirmText: '知道了'
               });
+                  notified[orderId] = true;
+                  wx.setStorageSync('generationSuccessNotified', notified);
+                }
+              } catch (e) {
+                // 如果本地存储异常，至少保证不会影响正常流程
+                console.error('记录生成成功提示状态失败:', e);
+              }
               
               return;
               
@@ -663,9 +708,14 @@ Page({
           } else {
             this.checkGenerationStatus(orderId, attempts + 1);
           }
-        },
-        fail: (err) => {
-          if (attempts >= 3) {
+      }).catch((err) => {
+        if (err && err.statusCode === 401) {
+          this.setData({
+            isGenerating: false,
+            generatedContent: '登录已过期，请重新登录后在文档库查看最新进度',
+            generateState: 'failed'
+          });
+        } else if (attempts >= 3) {
             this.setData({
               isGenerating: false,
               generatedContent: `✅ 文档正在后台生成\n\n《${this.data.lastGenerateTopic}》\n\n生成完成后请前往【文档库】查看`,
@@ -673,7 +723,6 @@ Page({
             });
           } else {
             this.checkGenerationStatus(orderId, attempts + 1);
-          }
         }
       });
     }, checkDelay);
@@ -716,6 +765,9 @@ Page({
     console.log('[首页] 一键登录成功', e.detail);
     this.refreshCredits();
     this.updateSummary();
+  },
+  noop() {
+    // 空函数用于阻止事件冒泡
   }
   
 });

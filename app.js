@@ -5,8 +5,11 @@ const docNotifications = require("./utils/doc-notifications.js");
 
 App({
   globalData: {
-    apiBaseUrl: "http://127.0.0.1:3000", // 模拟器默认地址
-    apiBaseUrlLAN: "http://172.20.10.8:3000", // 局域网地址（真机调试用）
+    // 统一使用公网正式环境作为默认 API 地址（开发版真机 & 上线版本都走这里）
+    apiBaseUrl: "https://yaoguangxiaoluo.cn",
+    apiBaseUrlLAN: "https://yaoguangxiaoluo.cn", // 保留字段名，实际同样指向公网
+    apiBaseUrlProd: "https://yaoguangxiaoluo.cn", // 正式环境域名
+    useProdApiInDevtools: true, // 开发工具也默认走线上域名
     userInfo: null
   },
   
@@ -28,31 +31,18 @@ App({
   
   // 检测环境并设置API地址
   detectEnvironmentAndSetAPI() {
-    wx.getSystemInfo({
-      success: (res) => {
-        let apiUrl;
-        
-        // 判断是否为模拟器
-        if (res.platform === 'devtools') {
-          // 模拟器环境：使用 localhost
-          apiUrl = this.globalData.apiBaseUrl;
-          console.log('🔧 [开发模式] 模拟器环境，使用 localhost');
-        } else {
-          // 真机环境：使用局域网IP
-          apiUrl = this.globalData.apiBaseUrlLAN;
-          console.log('📱 [生产模式] 真机环境，使用局域网IP');
-        }
-        
-        // 保存API地址到本地存储
-        wx.setStorageSync("apiBaseUrl", apiUrl);
-        console.log("API地址:", apiUrl);
-      },
-      fail: () => {
-        // 获取失败时使用默认地址
-        wx.setStorageSync("apiBaseUrl", this.globalData.apiBaseUrl);
-        console.log("API地址（默认）:", this.globalData.apiBaseUrl);
-      }
-    });
+    let envVersion = 'develop';
+    try {
+      const accountInfo = wx.getAccountInfoSync();
+      envVersion = accountInfo?.miniProgram?.envVersion || 'develop';
+    } catch (error) {
+      console.warn('无法获取envVersion，默认按开发环境处理', error);
+    }
+
+    // 无论开发版 / 体验版 / 正式版，统一走公网正式域名
+      const prodUrl = this.globalData.apiBaseUrlProd;
+      wx.setStorageSync('apiBaseUrl', prodUrl);
+    console.log(`🌐 [${envVersion}] 统一使用线上域名:`, prodUrl);
   },
   
   onShow() {

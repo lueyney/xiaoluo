@@ -2,7 +2,9 @@
   <view class="hero-card">
     <view class="hero-texts">
       <text class="hero-title">帮助中心</text>
-      <text class="hero-subtitle">为您提供全面的使用指南和技术支持</text>
+      <view class="hero-subtitle-wrapper">
+        <text class="hero-subtitle">为您提供全面的使用指南和技术支持</text>
+      </view>
     </view>
     
     <!-- 客服联系方式 -->
@@ -15,12 +17,12 @@
       <view class="contact-info-card">
         <view class="contact-item">
           <view class="contact-label">
-            <text class="label-icon">📱</text>
-            <text class="label-text">客服电话</text>
+            <text class="label-icon">💬</text>
+            <text class="label-text">客服微信</text>
           </view>
-          <text class="contact-value" selectable="true">18166973213</text>
-          <button class="contact-action" data-phone="18166973213" bindtap="onCallPhone">
-            <text>拨打</text>
+          <text class="contact-value" selectable="true">sea3012</text>
+          <button class="contact-action" data-wechat="sea3012" bindtap="onCopyWechat">
+            <text>复制</text>
           </button>
         </view>
         
@@ -64,7 +66,10 @@
 
   <view class="tag-group">
     <block wx:for="{{categories}}" wx:key="value">
-      <view class="tag {{item.value === activeCategory ? 'active' : ''}}" data-value="{{item.value}}" bindtap="onCategoryChange">{{item.label}}</view>
+      <view class="tag {{item.value === activeCategory ? 'active' : ''}}" data-value="{{item.value}}" bindtap="onCategoryChange">
+        <text class="tag-dot"></text>
+        <text>{{item.label}}</text>
+      </view>
     </block>
   </view>
 

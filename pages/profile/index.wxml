@@ -39,13 +39,13 @@
     <view wx:if="{{inviteTab === 'use'}}" class="tab-content">
       <view class="use-tip-banner">
         <text class="use-tip-icon">🎁</text>
-        <text class="use-tip-text">填写好友的邀请码，双方各得10积分奖励</text>
+        <text class="use-tip-text">填写好友邀请码后立得10积分，每个账号仅可填写一次</text>
       </view>
       
       <view class="invite-label">邀请码</view>
       <input 
         class="invite-code-input" 
-        placeholder="请输入入好友的邀请码" 
+        placeholder="请输入好友的邀请码" 
         maxlength="20" 
         value="{{inputInviteCode}}" 
         bindinput="onInviteCodeInput" />
@@ -61,8 +61,8 @@
       <view class="my-invite-banner">
         <text class="banner-icon">🎁</text>
         <view class="banner-text">
-          <text class="banner-title">填写好友邀请码</text>
-          <text class="banner-desc">填写好友的邀请码，双方各得10积分奖励</text>
+          <text class="banner-title">分享邀请码赚积分</text>
+          <text class="banner-desc">好友填写后可得10积分，您可按人领取30积分奖励</text>
         </view>
       </view>
       
@@ -83,6 +83,10 @@
           <text class="stat-number">{{inviteStats.earnedCredits || 0}}</text>
           <text class="stat-text">获得积分</text>
         </view>
+        <view class="stat-card highlight">
+          <text class="stat-number">{{inviteStats.claimableCount || 0}}</text>
+          <text class="stat-text">待领取奖励</text>
+        </view>
       </view>
       
       <view class="action-buttons">
@@ -95,6 +99,9 @@
           <text>分享给好友</text>
         </button>
       </view>
+      <button class="claim-btn" bindtap="claimInviteReward" loading="{{claimingInviteReward}}" disabled="{{claimingInviteReward || !(inviteStats.claimableCount > 0)}}">
+        {{inviteStats.claimableCount > 0 ? (claimingInviteReward ? '领取中...' : '立即领取邀请奖励') : '暂无可领取奖励'}}
+      </button>
     </view>
   </view>
 

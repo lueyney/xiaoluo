@@ -1,6 +1,7 @@
 const points = require("../../utils/points.js");
 const notifications = require("../../utils/notifications.js");
 const auth = require("../../utils/auth.js");
+const { getApiBaseUrl } = require("../../utils/request.js");
 
 Page({
   data: {
@@ -20,58 +21,55 @@ Page({
     },
     inviteStats: {
       invitedCount: 0,
-      earnedCredits: 0
+      earnedCredits: 0,
+      claimableCount: 0
     },
     inputInviteCode: "",
     submittingInvite: false,
+    claimingInviteReward: false,
     inviteTab: "my",
     hasUnreadNotification: false,
     showPhoneLoginModal: false,
     isLoading: true,
     lastLoadTime: 0
   },
+
   onLoad() {
-    // 立即显示页面，避免白屏
     this.setData({ isLoading: false });
     wx.hideLoading();
-    
+
     if (!this.checkLoginStatus()) {
       return;
     }
     this.initPage();
   },
-  
+
   onShow() {
     wx.setNavigationBarTitle({ title: "我的" });
-    
-    // 清除可能的loading遮罩
     wx.hideLoading();
-    
+
     if (!this.checkLoginStatus()) {
       return;
     }
-    
-    // 避免频繁刷新：5秒内不重复加载
+
     const now = Date.now();
     if (now - this.data.lastLoadTime < 5000) {
       return;
     }
-    
+
     this.loadUserInfoFromServer();
+    this.loadInviteStatus();
     this.refreshNotifications();
   },
-  
+
   initPage() {
-    // 先从本地加载
     this.loadLocalUserInfo();
-    
-    // 异步从服务器加载
     this.loadUserInfoFromServer();
+    this.loadInviteStatus();
     this.refreshNotifications();
   },
-  
+
   loadLocalUserInfo() {
-    // 从缓存加载用户信息，快速显示
     const userData = auth.getUserInfo();
     if (userData) {
       const credits = points.getCredits();
@@ -79,30 +77,29 @@ Page({
         'userInfo.nickname': userData.nickname || '学术研究者',
         'userInfo.avatar': userData.avatar || this.data.userInfo.avatar,
         'userInfo.credits': credits,
+        'userInfo.inviteCode': userData.inviteCode || '',
+        'userInfo.hasUsedInvite': !!userData.hasUsedInvite,
         'stats.balance': credits,
         isLoading: false
       });
     }
   },
-  
+
   checkLoginStatus() {
     return auth.requireLogin(true);
   },
-  
+
   loadUserInfoFromServer() {
     this.setData({ lastLoadTime: Date.now() });
     const token = auth.getToken();
     if (!token) {
       return;
     }
-    
+
     wx.showLoading({ title: "加载中..." });
-    
-    const app = getApp();
-    const apiBaseUrl = wx.getStorageSync("apiBaseUrl") || 
-                      (app && app.globalData && app.globalData.apiBaseUrl) || 
-                      "http://127.0.0.1:3000";
-    
+
+    const apiBaseUrl = getApiBaseUrl();
+
     wx.request({
       url: `${apiBaseUrl}/api/user/profile`,
       method: "GET",
@@ -113,8 +110,7 @@ Page({
       success: (res) => {
         if (res.data && res.data.code === "SUCCESS" && res.data.data) {
           const { userInfo, stats, hasUnreadNotification } = res.data.data;
-          
-          // 更新用户信息
+
           this.setData({
             userInfo: {
               nickname: userInfo.nickname || "用户",
@@ -132,35 +128,32 @@ Page({
             },
             inviteStats: {
               invitedCount: stats.invitedCount || 0,
-              earnedCredits: stats.gainedCredits || 0
+              earnedCredits: stats.gainedCredits || 0,
+              claimableCount: this.data.inviteStats.claimableCount || 0
             },
             hasUnreadNotification: hasUnreadNotification || false
           });
-          
-          // 更新本地存储的用户数据
-          const userData = auth.getUserInfo();
-          if (userData) {
-            userData.credits = userInfo.credits;
-            wx.setStorageSync("userData", userData);
-          }
-          
-          // 更新积分缓存
-          points.setCredits(userInfo.credits);
-          
-          // 同时获取真实订单数
+
+          const userData = auth.getUserInfo() || {};
+          userData.credits = userInfo.credits || 0;
+          userData.inviteCode = userInfo.inviteCode || "";
+          userData.hasUsedInvite = !!userInfo.hasUsedInvite;
+          wx.setStorageSync("userData", userData);
+
+          points.setCredits(userInfo.credits || 0);
           this.loadRealOrderCount();
         } else {
-          wx.showToast({ 
-            title: "获取用户信息失败", 
-            icon: "none" 
+          wx.showToast({
+            title: "获取用户信息失败",
+            icon: "none"
           });
         }
       },
       fail: (err) => {
         console.error("获取用户信息失败:", err);
-        wx.showToast({ 
-          title: "网络异常，请稍后重试", 
-          icon: "none" 
+        wx.showToast({
+          title: "网络异常，请稍后重试",
+          icon: "none"
         });
       },
       complete: () => {
@@ -168,14 +161,38 @@ Page({
       }
     });
   },
-  
+
+  loadInviteStatus() {
+    const token = auth.getToken();
+    if (!token) {
+      return;
+    }
+
+    const apiBaseUrl = getApiBaseUrl();
+    wx.request({
+      url: `${apiBaseUrl}/api/user/invite/status`,
+      method: 'GET',
+      header: {
+        'Authorization': `Bearer ${token}`
+      },
+      success: (res) => {
+        if (res.data && res.data.code === 'SUCCESS' && res.data.data) {
+          this.setData({
+            'userInfo.inviteCode': res.data.data.inviteCode || this.data.userInfo.inviteCode,
+            'inviteStats.claimableCount': Number(res.data.data.claimableCount || 0)
+          });
+        }
+      },
+      fail: (err) => {
+        console.error('获取邀请状态失败:', err);
+      }
+    });
+  },
+
   loadRealOrderCount() {
     const token = auth.getToken();
-    const app = getApp();
-    const apiBaseUrl = wx.getStorageSync("apiBaseUrl") || 
-                      (app && app.globalData && app.globalData.apiBaseUrl) || 
-                      "http://127.0.0.1:3000";
-    
+    const apiBaseUrl = getApiBaseUrl();
+
     wx.request({
       url: `${apiBaseUrl}/api/orders`,
       method: "GET",
@@ -184,7 +201,7 @@ Page({
       },
       success: (res) => {
         if (res.data && res.data.code === "SUCCESS" && res.data.data) {
-          const totalOrders = res.data.data.pagination.total || 0;
+          const totalOrders = (res.data.data.pagination && res.data.data.pagination.total) || 0;
           this.setData({
             "stats.totalOrders": totalOrders
           });
@@ -195,22 +212,7 @@ Page({
       }
     });
   },
-  
-  loadUserInfo() {
-    const userData = auth.getUserInfo();
-    if (userData) {
-      this.setData({
-        userInfo: {
-          nickname: userData.nickname || "用户",
-          avatar: userData.avatar,
-          vipLevel: userData.vipLevel || "普通会员",
-          registerDate: userData.registerDate || "2024-01-01",
-          credits: userData.credits || 0
-        },
-        inviteCode: userData.inviteCode || "LUNJUN2024"
-      });
-    }
-  },
+
   refreshCredits() {
     const balance = points.getCredits();
     this.setData({
@@ -218,6 +220,7 @@ Page({
       "stats.balance": balance
     });
   },
+
   refreshNotifications() {
     const unread = notifications.hasUnread();
     this.setData({ hasUnreadNotification: unread });
@@ -227,34 +230,7 @@ Page({
       wx.hideTabBarRedDot({ index: 4 });
     }
   },
-  handleQuickAction(e) {
-    const action = e.currentTarget.dataset.key;
-    if (action === "balance") {
-      wx.showToast({ title: "余额功能开发中", icon: "none" });
-      return;
-    }
-    if (action === "invite") {
-      this.handleInviteNow();
-      return;
-    }
-    if (action === "wheel") {
-      wx.showToast({ title: "幸运转盘敬请期待", icon: "none" });
-      return;
-    }
-  },
-  handleInviteNow() {
-    wx.showModal({
-      title: "邀请好友",
-      content: "邀请好友注册，即可双方各得100积分奖励",
-      showCancel: false
-    });
-  },
-  copyInviteCode() {
-    wx.setClipboardData({
-      data: this.data.inviteCode,
-      success: () => wx.showToast({ title: "邀请码已复制", icon: "success" })
-    });
-  },
+
   handleFeatureTap(e) {
     const key = e.currentTarget.dataset.key;
     const routeMap = {
@@ -274,11 +250,11 @@ Page({
     }
     wx.showToast({ title: "功能开发中", icon: "none" });
   },
+
   handleLogout() {
     auth.logout();
   },
-  
-  // 复制邀请码
+
   copyInviteCode() {
     const inviteCode = this.data.userInfo.inviteCode;
     if (!inviteCode) {
@@ -288,7 +264,7 @@ Page({
       });
       return;
     }
-    
+
     wx.setClipboardData({
       data: inviteCode,
       success: () => {
@@ -299,8 +275,7 @@ Page({
       }
     });
   },
-  
-  // 分享邀请码
+
   shareInviteCode() {
     const inviteCode = this.data.userInfo.inviteCode;
     if (!inviteCode) {
@@ -310,10 +285,10 @@ Page({
       });
       return;
     }
-    
+
     wx.showModal({
       title: '邀请好友',
-      content: `您的邀请码是：${inviteCode}\n\n好友注册时填写此邀请码，双方各得10积分！`,
+      content: `您的邀请码是：${inviteCode}\n\n好友填写后可得10积分，您可领取30积分邀请奖励。`,
       confirmText: '复制邀请码',
       success: (res) => {
         if (res.confirm) {
@@ -322,22 +297,65 @@ Page({
       }
     });
   },
-  
-  // 切换邀请Tab
+
+  claimInviteReward() {
+    if (this.data.claimingInviteReward) {
+      return;
+    }
+
+    const count = Number(this.data.inviteStats.claimableCount || 0);
+    if (count <= 0) {
+      wx.showToast({ title: '暂无可领取奖励', icon: 'none' });
+      return;
+    }
+
+    const token = auth.getToken();
+    const apiBaseUrl = getApiBaseUrl();
+    this.setData({ claimingInviteReward: true });
+
+    wx.request({
+      url: `${apiBaseUrl}/api/user/invite/claim`,
+      method: 'POST',
+      header: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      },
+      success: (res) => {
+        if (res.data && res.data.code === 'SUCCESS' && res.data.data) {
+          const claimedCredits = Number(res.data.data.claimedCredits || 0);
+          if (claimedCredits > 0) {
+            wx.showToast({ title: `已领取${claimedCredits}积分`, icon: 'success' });
+          } else {
+            wx.showToast({ title: res.data.message || '暂无可领取奖励', icon: 'none' });
+          }
+          this.loadUserInfoFromServer();
+          this.loadInviteStatus();
+        } else {
+          wx.showToast({ title: (res.data && (res.data.error || res.data.message)) || '领取失败', icon: 'none' });
+        }
+      },
+      fail: (err) => {
+        console.error('领取邀请奖励失败:', err);
+        wx.showToast({ title: '网络异常，请重试', icon: 'none' });
+      },
+      complete: () => {
+        this.setData({ claimingInviteReward: false });
+      }
+    });
+  },
+
   switchInviteTab(e) {
     const tab = e.currentTarget.dataset.tab;
     this.setData({ inviteTab: tab });
   },
-  
-  // 输入邀请码
+
   onInviteCodeInput(e) {
     this.setData({ inputInviteCode: e.detail.value.trim() });
   },
-  
-  // 提交邀请码
+
   submitInviteCode() {
     const code = this.data.inputInviteCode;
-    
+
     if (!code) {
       wx.showToast({
         title: '请输入邀请码',
@@ -345,7 +363,7 @@ Page({
       });
       return;
     }
-    
+
     if (code === this.data.userInfo.inviteCode) {
       wx.showToast({
         title: '不能使用自己的邀请码',
@@ -353,17 +371,14 @@ Page({
       });
       return;
     }
-    
+
     this.setData({ submittingInvite: true });
-    
+
     const token = auth.getToken();
-    const app = getApp();
-    const apiBaseUrl = wx.getStorageSync("apiBaseUrl") || 
-                      (app && app.globalData && app.globalData.apiBaseUrl) || 
-                      "http://127.0.0.1:3000";
-    
+    const apiBaseUrl = getApiBaseUrl();
+
     wx.request({
-      url: `${apiBaseUrl}/api/user/use-invite-code`,
+      url: `${apiBaseUrl}/api/user/invite/bind`,
       method: 'POST',
       header: {
         'Content-Type': 'application/json',
@@ -377,15 +392,15 @@ Page({
             icon: 'success',
             duration: 2000
           });
-          
-          // 重新加载用户信息
+
           setTimeout(() => {
             this.loadUserInfoFromServer();
+            this.loadInviteStatus();
             this.setData({ inputInviteCode: '' });
-          }, 2000);
+          }, 600);
         } else {
           wx.showToast({
-            title: res.data.message || '邀请码无效',
+            title: (res.data && (res.data.error || res.data.message)) || '邀请码无效',
             icon: 'none',
             duration: 2000
           });
@@ -403,29 +418,26 @@ Page({
       }
     });
   },
-  
-  // 显示一键登录弹窗
+
   showPhoneLoginModal() {
     this.setData({ showPhoneLoginModal: true });
   },
-  
-  // 关闭一键登录弹窗
+
   onPhoneLoginClose() {
     this.setData({ showPhoneLoginModal: false });
   },
-  
-  // 一键登录成功
+
   onPhoneLoginSuccess(e) {
     console.log('[我的] 一键登录成功', e.detail);
     this.loadUserInfoFromServer();
+    this.loadInviteStatus();
   },
-  
-  // 微信分享功能
-  onShareAppMessage(res) {
+
+  onShareAppMessage() {
     const inviteCode = this.data.userInfo.inviteCode;
-    
+
     return {
-      title: `论文君邀请您注册！使用邀请码 ${inviteCode}，双方各得10积分`,
+      title: `论文君邀请您注册！使用邀请码 ${inviteCode}，填写后可得10积分`,
       path: `/pages/register/index?inviteCode=${inviteCode}`,
       imageUrl: '/assets/app-logo.png'
     };

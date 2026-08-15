@@ -1,6 +1,7 @@
 const points = require("../../utils/points.js");
 const notifications = require("../../utils/notifications.js");
 const auth = require("../../utils/auth.js");
+const { getApiBaseUrl } = require("../../utils/request.js");
 
 Page({
   data: {
@@ -50,10 +51,7 @@ Page({
     this.setData({ loading: true });
     
     const token = auth.getToken();
-    const app = getApp();
-    const apiBaseUrl = wx.getStorageSync("apiBaseUrl") || 
-                      (app && app.globalData && app.globalData.apiBaseUrl) || 
-                      "http://127.0.0.1:3000";
+    const apiBaseUrl = getApiBaseUrl();
     
     wx.request({
       url: `${apiBaseUrl}/api/orders`,
@@ -137,7 +135,8 @@ Page({
     if (!typeString) return [];
     
     const docTypeMap = {
-      '学术论文': { label: '学术论文', color: '#818cf8', bg: 'rgba(129,140,248,0.12)' },
+      '学术范文': { label: '学术范文', color: '#818cf8', bg: 'rgba(129,140,248,0.12)' },
+      '学术论文': { label: '学术范文', color: '#818cf8', bg: 'rgba(129,140,248,0.12)' }, // 兼容历史数据
       '开题报告': { label: '开题报告', color: '#a78bfa', bg: 'rgba(167,139,250,0.12)' },
       '任务书': { label: '任务书', color: '#c084fc', bg: 'rgba(192,132,252,0.12)' },
       '文献综述': { label: '文献综述', color: '#e879f9', bg: 'rgba(232,121,249,0.12)' },
@@ -153,9 +152,9 @@ Page({
       }
     }
     
-    // 如果没有匹配到，说明是旧格式（AI创作-xxx），默认为学术论文
+    // 如果没有匹配到，说明是旧格式（AI创作-xxx），默认为学术范文
     if (tags.length === 0 && typeString.includes('AI创作')) {
-      tags.push(docTypeMap['学术论文']);
+      tags.push(docTypeMap['学术范文']);
     }
     
     return tags;

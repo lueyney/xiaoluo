@@ -3,14 +3,13 @@
  */
 
 const auth = require("./auth.js");
+const { getApiBaseUrl } = require("./request.js");
 
-// 获取当前用户的积分存储key
 function getUserCreditsKey() {
   const userData = auth.getUserInfo();
   if (userData && userData.id) {
     return `userCredits_${userData.id}`;
   }
-  // 如果没有用户信息，返回默认key（兼容旧版本）
   return "userCredits";
 }
 
@@ -20,15 +19,13 @@ function ensureCredits() {
   if (typeof stored === "number" && !isNaN(stored)) {
     return stored;
   }
-  
-  // 尝试从用户数据中获取积分
+
   const userData = auth.getUserInfo();
   if (userData && typeof userData.credits === "number") {
     wx.setStorageSync(key, userData.credits);
     return userData.credits;
   }
-  
-  // 默认值
+
   wx.setStorageSync(key, 0);
   return 0;
 }
@@ -42,24 +39,16 @@ function setCredits(value) {
   const safe = isNaN(amount) ? 0 : Math.max(0, Math.floor(amount));
   const key = getUserCreditsKey();
   wx.setStorageSync(key, safe);
-  
-  // 同时更新 userData 中的积分
+
   const userData = auth.getUserInfo();
   if (userData) {
     userData.credits = safe;
     wx.setStorageSync("userData", userData);
   }
-  
+
   return safe;
 }
 
-/**
- * 增加积分（同步到服务器）
- * @param {number} delta 增加的积分数量
- * @param {string} source 来源
- * @param {string} description 描述
- * @returns {Promise<number>} 新的积分余额
- */
 async function addCredits(delta, source = 'earn', description = '积分获得') {
   return new Promise((resolve, reject) => {
     const amount = Number(delta || 0);
@@ -70,17 +59,13 @@ async function addCredits(delta, source = 'earn', description = '积分获得') 
 
     const token = auth.getToken();
     if (!token) {
-      // 未登录，只更新本地缓存
       const current = getCredits();
       const remaining = setCredits(current + amount);
       resolve(remaining);
       return;
     }
 
-    const app = getApp();
-    const apiBaseUrl = wx.getStorageSync("apiBaseUrl") || 
-                      (app && app.globalData && app.globalData.apiBaseUrl) || 
-                      "http://127.0.0.1:3000";
+    const apiBaseUrl = getApiBaseUrl();
 
     wx.request({
       url: `${apiBaseUrl}/api/user/credits/add`,
@@ -109,13 +94,6 @@ async function addCredits(delta, source = 'earn', description = '积分获得') 
   });
 }
 
-/**
- * 消耗积分（同步到服务器）
- * @param {number} cost 消耗的积分数量
- * @param {string} source 来源
- * @param {string} description 描述
- * @returns {Promise<number>} 剩余积分
- */
 async function consumeCredits(cost, source = 'consume', description = '积分消费') {
   return new Promise((resolve, reject) => {
     const amount = Number(cost || 0);
@@ -132,16 +110,12 @@ async function consumeCredits(cost, source = 'consume', description = '积分消
 
     const token = auth.getToken();
     if (!token) {
-      // 未登录，只更新本地缓存
       const remaining = setCredits(current - amount);
       resolve(remaining);
       return;
     }
 
-    const app = getApp();
-    const apiBaseUrl = wx.getStorageSync("apiBaseUrl") || 
-                      (app && app.globalData && app.globalData.apiBaseUrl) || 
-                      "http://127.0.0.1:3000";
+    const apiBaseUrl = getApiBaseUrl();
 
     wx.request({
       url: `${apiBaseUrl}/api/user/credits/consume`,
@@ -170,9 +144,6 @@ async function consumeCredits(cost, source = 'consume', description = '积分消
   });
 }
 
-/**
- * 从服务器同步积分（需要传入token）
- */
 async function syncCreditsFromServer() {
   return new Promise((resolve, reject) => {
     const token = auth.getToken();
@@ -180,12 +151,9 @@ async function syncCreditsFromServer() {
       reject(new Error("未登录"));
       return;
     }
-    
-    const app = getApp();
-    const apiBaseUrl = wx.getStorageSync("apiBaseUrl") || 
-                      (app && app.globalData && app.globalData.apiBaseUrl) || 
-                      "http://127.0.0.1:3000";
-    
+
+    const apiBaseUrl = getApiBaseUrl();
+
     wx.request({
       url: `${apiBaseUrl}/api/user/profile`,
       method: "GET",
@@ -211,9 +179,6 @@ async function syncCreditsFromServer() {
   });
 }
 
-/**
- * 清除当前用户的积分缓存
- */
 function clearCredits() {
   const key = getUserCreditsKey();
   wx.removeStorageSync(key);
@@ -228,4 +193,3 @@ module.exports = {
   syncCreditsFromServer,
   clearCredits
 };
-

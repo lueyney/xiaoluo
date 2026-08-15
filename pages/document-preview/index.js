@@ -160,74 +160,173 @@ Page({
           const downloadUrl = `${apiBaseUrl}${res.data.data.downloadUrl}`;
           console.log('准备下载:', downloadUrl);
           
-          // 步骤2: 下载Word文档
+          // 步骤2: 定义带.docx后缀的文件路径（关键！确保手机能识别文件类型）
+          // 注意：后端现在使用 docx 库生成真正的 .docx 二进制文件，iOS/Android/PC 全平台支持
+          // 使用 wx.env.USER_DATA_PATH 获取小程序专用临时目录
+          // 清理文件名中的非法字符，确保文件名合法
+          const safeTitle = doc.title.replace(/[<>:"/\\|?*]/g, '_').substring(0, 50); // 限制长度避免路径过长
+          const fileName = `${safeTitle}_${new Date().getTime()}.docx`; // 使用.docx后缀，与后端生成的文件格式一致
+          const localPath = `${wx.env.USER_DATA_PATH}/${fileName}`;
+          console.log('指定文件路径:', localPath);
+          
+          // 步骤3: 下载Word文档到指定路径
           wx.downloadFile({
             url: downloadUrl,
+            filePath: localPath, // 👇 关键点1：指定带.docx后缀的文件路径，确保手机系统能识别文件类型
             header: {
               "Authorization": `Bearer ${token}`
             },
             timeout: 30000,
             success: (downloadRes) => {
-              wx.hideLoading();
               console.log('下载响应:', downloadRes);
               
               if (downloadRes.statusCode === 200) {
-                const filePath = downloadRes.tempFilePath;
+                // 使用下载后的文件路径（如果指定了filePath，tempFilePath就是localPath）
+                const filePath = downloadRes.tempFilePath || localPath;
                 console.log('文件路径:', filePath);
                 
-                // 步骤3: 保存到本地相册（可选）
-                wx.saveFile({
-                  tempFilePath: filePath,
-                  success: (saveRes) => {
-                    const savedPath = saveRes.savedFilePath;
-                    console.log('文件已保存:', savedPath);
+                // 验证文件格式：检查文件头是否为有效的 ZIP 格式（docx 本质上是 ZIP）
+                wx.getFileInfo({
+                  filePath: filePath,
+                  success: (fileInfo) => {
+                    console.log('文件信息:', fileInfo);
                     
-                    // 步骤4: 提示用户并打开预览
+                    // 验证文件大小（docx 文件至少应该有几千字节）
+                    if (fileInfo.size < 1000) {
+                      wx.hideLoading();
+                      console.error('文件大小异常:', fileInfo.size);
+                      wx.showModal({
+                        title: '文件异常',
+                        content: `下载的文件大小异常（${fileInfo.size} 字节），可能下载失败\n\n请重试导出`,
+                        showCancel: false
+                      });
+                      return;
+                    }
+                    
+                    // 读取文件头验证格式（docx 文件头应该是 ZIP 格式：PK..）
+                    wx.readFile({
+                      filePath: filePath,
+                      length: 4, // 只读取前 4 个字节
+                      position: 0,
+                      success: (readRes) => {
+                        const fileHeader = readRes.data;
+                        // ZIP 文件头: 50 4B 03 04 (PK..)
+                        const isValidDocx = fileHeader.length >= 4 && 
+                          fileHeader[0] === 0x50 && 
+                          fileHeader[1] === 0x4B && 
+                          fileHeader[2] === 0x03 && 
+                          fileHeader[3] === 0x04;
+                        
+                        if (!isValidDocx) {
+                          wx.hideLoading();
+                          console.error('文件格式验证失败，文件头:', Array.from(fileHeader).map(b => '0x' + b.toString(16).padStart(2, '0')).join(' '));
+                          wx.showModal({
+                            title: '文件格式异常',
+                            content: `下载的文件不是有效的 Word 文档格式\n\n可能原因：\n1. 网络传输错误\n2. 服务器生成失败\n\n请重试导出`,
+                            showCancel: false
+                          });
+                          return;
+                        }
+                        
+                        console.log('✅ 文件格式验证通过，文件头: PK..');
+                        wx.hideLoading();
+                        
+                        // 步骤4: 提示用户并打开预览
+                        wx.showModal({
+                          title: "导出成功",
+                          content: `《${doc.title}》\n\n已生成Word文档，点击"打开"可预览\n\n在预览界面点击右上角"..."可分享给好友`,
+                          confirmText: "打开预览",
+                          cancelText: "稍后查看",
+                          success: (modalRes) => {
+                            if (modalRes.confirm) {
+                              // 步骤5: 打开Word文档预览
+                              // 关键修复：确保 fileType 明确指定为 'docx'，iOS 需要这个参数
+                              wx.openDocument({
+                                filePath: filePath, // 使用验证后的文件路径
+                                fileType: 'docx',   // 显式指定文件类型为 docx（iOS 必需）
+                                showMenu: true,      // 显示右上角菜单（分享等）
+                                success: () => {
+                                  console.log('✅ Word文档打开成功，用户可以在预览界面分享');
+                                },
+                                fail: (err) => {
+                                  console.error('❌ 打开Word失败:', err);
+                                  // 提供更详细的错误信息
+                                  let errorMsg = err.errMsg || '未知错误';
+                                  if (errorMsg.includes('912') || errorMsg.includes('OfficeImportErrorDomain')) {
+                                    errorMsg = 'iOS 系统无法识别文件格式（错误 912）\n\n可能原因：\n1. 文件格式不标准\n2. iOS 系统版本过低\n\n建议：\n1. 尝试使用其他应用打开\n2. 更新 iOS 系统';
+                                  }
+                                  wx.showModal({
+                                    title: '打开失败',
+                                    content: `文档已下载，但打开失败\n\n错误: ${errorMsg}\n\n提示：可以尝试使用其他支持 .docx 格式的应用打开`,
+                                    showCancel: false
+                                  });
+                                }
+                              });
+                            }
+                          }
+                        });
+                      },
+                      fail: (readErr) => {
+                        wx.hideLoading();
+                        console.error('读取文件头失败:', readErr);
+                        // 如果读取失败，仍然尝试打开（可能是权限问题）
+                        wx.showModal({
+                          title: "导出成功",
+                          content: `《${doc.title}》\n\n已生成Word文档，点击"打开"可预览`,
+                          confirmText: "打开预览",
+                          cancelText: "稍后查看",
+                          success: (modalRes) => {
+                            if (modalRes.confirm) {
+                              wx.openDocument({
+                                filePath: filePath,
+                                fileType: 'docx',
+                                showMenu: true,
+                                success: () => {
+                                  console.log('✅ Word文档打开成功');
+                                },
+                                fail: (err) => {
+                                  console.error('❌ 打开Word失败:', err);
+                                  wx.showModal({
+                                    title: '打开失败',
+                                    content: `错误: ${err.errMsg || '未知错误'}\n\n请重试或使用其他应用打开`,
+                                    showCancel: false
+                                  });
+                                }
+                              });
+                            }
+                          }
+                        });
+                      }
+                    });
+                  },
+                  fail: (fileInfoErr) => {
+                    wx.hideLoading();
+                    console.error('获取文件信息失败:', fileInfoErr);
+                    // 如果获取文件信息失败，仍然尝试打开
                     wx.showModal({
                       title: "导出成功",
-                      content: `《${doc.title}》\n\n已生成Word文档，点击"打开"可预览\n\n在预览界面点击右上角"..."可分享给好友`,
+                      content: `《${doc.title}》\n\n已生成Word文档，点击"打开"可预览`,
                       confirmText: "打开预览",
                       cancelText: "稍后查看",
                       success: (modalRes) => {
                         if (modalRes.confirm) {
-                          // 步骤5: 打开Word文档预览
                           wx.openDocument({
-                            filePath: savedPath,
-                            fileType: 'doc',
-                            showMenu: true,  // 显示右上角菜单（分享等）
+                            filePath: filePath,
+                            fileType: 'docx',
+                            showMenu: true,
                             success: () => {
-                              console.log('✅ Word文档打开成功，用户可以在预览界面分享');
+                              console.log('✅ Word文档打开成功');
                             },
                             fail: (err) => {
                               console.error('❌ 打开Word失败:', err);
                               wx.showModal({
-                                title: '提示',
-                                content: '文档已保存，但打开失败\n\n请到文件管理查看',
+                                title: '打开失败',
+                                content: `错误: ${err.errMsg || '未知错误'}`,
                                 showCancel: false
                               });
                             }
                           });
                         }
-                      }
-                    });
-                  },
-                  fail: (saveErr) => {
-                    console.error('保存文件失败:', saveErr);
-                    // 即使保存失败，也尝试打开临时文件
-                    wx.openDocument({
-                      filePath: filePath,
-                      fileType: 'doc',
-                      showMenu: true,
-                      success: () => {
-                        console.log('使用临时文件打开成功');
-                      },
-                      fail: (openErr) => {
-                        console.error('打开失败:', openErr);
-                        wx.showModal({
-                          title: '导出失败',
-                          content: '无法打开文档，请稍后重试',
-                          showCancel: false
-                        });
                       }
                     });
                   }

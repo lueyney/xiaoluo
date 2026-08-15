@@ -10,7 +10,7 @@
       <view class="welcome-section">
         <image class="welcome-icon" src="/assets/app-logo.png" mode="aspectFill"></image>
         <text class="welcome-title">欢迎使用论文君</text>
-        <text class="welcome-desc">使用微信手机号快速登录</text>
+        <text class="welcome-desc">使用手机号快捷登录</text>
       </view>
       
       <button 
@@ -20,7 +20,7 @@
         loading="{{loading}}"
         disabled="{{loading}}">
         <text class="btn-icon">📱</text>
-        <text class="btn-text">{{loading ? '登录中...' : '微信手机号一键登录'}}</text>
+        <text class="btn-text">{{loading ? '登录中...' : '手机号一键登录'}}</text>
       </button>
       
       <view class="login-tips">

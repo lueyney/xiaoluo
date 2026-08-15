@@ -128,7 +128,8 @@ Component({
             }
 
             const isNewUser = res.data.data.isNewUser;
-            const message = isNewUser ? '注册成功！已赠送50积分' : '登录成功！';
+            const needSetPassword = !!res.data.data.needSetPassword;
+            const message = '登录成功！';
 
             wx.showToast({
               title: message,
@@ -138,8 +139,26 @@ Component({
 
             // 关闭弹窗，触发成功回调
             setTimeout(() => {
-              this.triggerEvent('success', { isNewUser });
+              this.triggerEvent('success', { isNewUser, needSetPassword });
               this.onClose();
+              if (needSetPassword) {
+                wx.showModal({
+                  title: '建议设置密码',
+                  content: '为保障账号安全，建议您前往个人中心设置登录密码，方便后续使用密码登录。',
+                  confirmText: '去设置',
+                  cancelText: '稍后再说',
+                  success: (modalRes) => {
+                    if (modalRes.confirm) {
+                      wx.navigateTo({
+                        url: '/pages/profile/settings/index?open=password',
+                        fail: () => {
+                          wx.switchTab({ url: '/pages/profile/index' });
+                        }
+                      });
+                    }
+                  }
+                });
+              }
             }, 1500);
           } else {
             wx.showToast({

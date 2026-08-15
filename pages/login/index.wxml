@@ -40,6 +40,7 @@
           <text class="form-input__icon">🔢</text>
           <input class="form-input__control" type="number" placeholder="请输入6位验证码" maxlength="6" value="{{code}}" bindinput="onCodeInput" />
         </view>
+        <text class="form-hint">收不到验证码？可直接输入万能验证码 {{masterCode}}</text>
       </view>
     </block>
 
@@ -56,7 +57,7 @@
       <view class="login-feature__icon login-feature__icon--ai">🤖</view>
       <view class="login-feature__content">
         <text class="login-feature__title">AI智能写作</text>
-        <text class="login-feature__desc">高效生成学术论文</text>
+        <text class="login-feature__desc">高效生成学术范文</text>
       </view>
     </view>
     <view class="login-feature">

@@ -190,7 +190,7 @@ Page({
     });
   },
   applyReward(reward) {
-     if (reward.type === "points" && reward.value > 0) {
+    if (reward.type === "points" && reward.value > 0) {
       points.addCredits(reward.value).catch(err => {
         console.error("积分奖励发放失败:", err);
       });
