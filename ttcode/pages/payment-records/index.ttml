@@ -1,0 +1,59 @@
+﻿<view class="payment-records-page">
+  <view class="header-card">
+    <text class="header-title">支付记录</text>
+    <text class="header-subtitle">所有充值订单</text>
+  </view>
+
+  <view tt:if="{{loading}}" class="loading">
+    <text>加载中...</text>
+  </view>
+
+  <view tt:elif="{{orders.length === 0}}" class="empty-state">
+    <text class="empty-icon">📝</text>
+    <text class="empty-title">暂无支付记录</text>
+    <text class="empty-tip">去充值页面选择套餐吧</text>
+  </view>
+
+  <view tt:else class="orders-list">
+    <view tt:for="{{orders}}" tt:key="orderId" class="order-item">
+      <view class="order-header">
+        <view class="order-status {{item.status}}">
+          <text tt:if="{{item.status === 'paid'}}">✅ 已支付</text>
+          <text tt:elif="{{item.status === 'pending'}}">⏳ 待支付</text>
+          <text tt:elif="{{item.status === 'failed'}}">❌ 失败</text>
+          <text tt:else>❓ 未知</text>
+        </view>
+        <text class="order-id">订单#{{item.orderId}}</text>
+      </view>
+
+      <view class="order-body">
+        <view class="order-row">
+          <text class="label">充值金额</text>
+          <text class="value amount">¥{{item.amount}}</text>
+        </view>
+        <view class="order-row">
+          <text class="label">获得积分</text>
+          <text class="value credits">{{item.credits}} 积分</text>
+        </view>
+        <view class="order-row">
+          <text class="label">创建时间</text>
+          <text class="value time">{{item.createdAt}}</text>
+        </view>
+        <view tt:if="{{item.paidAt}}" class="order-row">
+          <text class="label">支付时间</text>
+          <text class="value time">{{item.paidAt}}</text>
+        </view>
+      </view>
+
+      <view tt:if="{{item.status === 'pending'}}" class="order-footer">
+        <button class="complete-btn" data-id="{{item.orderId}}" bindtap="completeOrder">
+          <text>查询支付状态</text>
+        </button>
+        <view class="order-tip">
+          <text>已支付？点击验证后发放积分</text>
+        </view>
+      </view>
+    </view>
+  </view>
+</view>
+

@@ -1,0 +1,92 @@
+﻿<view class="wheel-page">
+  <view class="hero-card">
+    <view class="hero-left">
+      <text class="hero-title">🎯 幸运转盘</text>
+      <text class="hero-subtitle">每日抽奖赢取积分与权益</text>
+    </view>
+    <view class="hero-badge {{hasDrawnToday ? 'used' : 'available'}}">
+      <text class="badge-text">{{hasDrawnToday ? '已抽奖' : '可抽奖'}}</text>
+      <text class="badge-count">{{remainingChances}}/1</text>
+    </view>
+  </view>
+
+  <view class="wheel-card">
+    <view class="wheel-container">
+      <view class="wheel-board {{isSpinning ? 'spinning' : ''}}">
+        <block tt:for="{{rewards}}" tt:key="label">
+          <view class="wheel-segment segment-{{index}}">
+            <text class="segment-label">{{item.label}}</text>
+          </view>
+        </block>
+      </view>
+      <view class="wheel-pointer"></view>
+      <view class="wheel-center {{hasDrawnToday ? 'disabled' : ''}}" bindtap="onSpin">
+        <text class="center-icon">{{isSpinning ? '🎲' : hasDrawnToday ? '✓' : '🎁'}}</text>
+        <text class="center-text">{{isSpinning ? '抽取中' : hasDrawnToday ? '已抽奖' : '开始'}}</text>
+      </view>
+    </view>
+    <text class="wheel-hint" tt:if="{{hasDrawnToday}}">明天0点可再次抽奖</text>
+    <text class="wheel-hint" tt:if="{{!hasDrawnToday}}">点击中心按钮开始抽奖</text>
+  </view>
+
+  <view class="result-card" tt:if="{{lastReward}}">
+    <view class="result-icon-wrapper">
+      <text class="result-icon">🎁</text>
+    </view>
+    <text class="result-title">🎉 恭喜获得</text>
+    <text class="result-reward">{{lastReward.label}}</text>
+    <text class="result-desc">{{lastReward.desc}}</text>
+    <view class="result-divider"></view>
+    <text class="result-hint">奖励已自动发放到账户</text>
+  </view>
+
+  <view class="tips-card">
+    <view class="tips-header">
+      <text class="tips-icon">💡</text>
+      <text class="tips-title">抽奖说明</text>
+    </view>
+    <view class="tips-content">
+      <view class="tip-item">
+        <text class="tip-dot">•</text>
+        <text class="tip-text">每天0点重置，可免费抽奖1次</text>
+      </view>
+      <view class="tip-item">
+        <text class="tip-dot">•</text>
+        <text class="tip-text">积分奖励自动发放到账户</text>
+      </view>
+      <view class="tip-item">
+        <text class="tip-dot">•</text>
+        <text class="tip-text">降重券可在AI降重时使用</text>
+      </view>
+    </view>
+  </view>
+
+  <view class="history-card">
+    <view class="history-header">
+      <view class="header-left">
+        <text class="history-icon">📋</text>
+        <text class="history-title">抽奖记录</text>
+      </view>
+      <text class="history-count">共{{history.length}}次</text>
+    </view>
+    <scroll-view scroll-y="true" class="history-scroll" tt:if="{{history.length > 0}}">
+      <block tt:for="{{history}}" tt:key="time">
+        <view class="history-item">
+          <view class="history-left">
+            <text class="history-icon-small">{{item.label.includes('积分') ? '💰' : item.label.includes('券') ? '🎫' : '🎁'}}</text>
+            <view class="history-text-group">
+              <text class="history-reward">{{item.label}}</text>
+              <text class="history-time">{{item.time}}</text>
+            </view>
+          </view>
+        </view>
+      </block>
+    </scroll-view>
+    <view tt:if="{{!history.length}}" class="empty-state">
+      <text class="empty-icon">🎯</text>
+      <text class="empty-text">{{hasDrawnToday ? '今日抽奖记录加载中...' : '今日还未抽奖'}}</text>
+      <text class="empty-desc" tt:if="{{!hasDrawnToday}}">点击上方转盘开始抽奖吧</text>
+    </view>
+  </view>
+</view>
+

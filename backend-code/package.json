@@ -1,0 +1,57 @@
+{
+  "name": "lunjun-backend",
+  "version": "1.0.0",
+  "description": "论文君微信小程序后端API服务",
+  "main": "app.js",
+  "scripts": {
+    "start": "node app.js",
+    "dev": "nodemon app.js",
+    "test": "jest",
+    "init-db": "node scripts/init-database.js",
+    "test-db": "node scripts/test-connection.js",
+    "check-paperfake": "node scripts/check-paperfake-config.js",
+    "check-sms": "node scripts/check-sms-config.js"
+  },
+  "keywords": [
+    "wechat",
+    "miniprogram",
+    "ai",
+    "writing",
+    "academic"
+  ],
+  "author": "论文君团队",
+  "license": "MIT",
+  "dependencies": {
+    "@langchain/core": "^1.1.48",
+    "@langchain/langgraph": "^1.4.9",
+    "axios": "^1.12.2",
+    "bcryptjs": "^2.4.3",
+    "cors": "^2.8.5",
+    "docx": "^9.5.1",
+    "dotenv": "^16.3.1",
+    "express": "^4.18.2",
+    "express-rate-limit": "^7.1.5",
+    "express-validator": "^7.0.1",
+    "helmet": "^7.1.0",
+    "joi": "^17.11.0",
+    "jsonwebtoken": "^9.0.2",
+    "js-yaml": "^3.14.1",
+    "jszip": "^3.10.1",
+    "moment": "^2.29.4",
+    "multer": "^1.4.5-lts.1",
+    "mysql2": "^3.6.5",
+    "pdfjs-dist": "4.8.69",
+    "tencentcloud-sdk-nodejs": "^4.0.879",
+    "winston": "^3.11.0",
+    "xml-js": "^1.6.11",
+    "zod": "^4.2.0"
+  },
+  "devDependencies": {
+    "jest": "^29.7.0",
+    "nodemon": "^3.0.2",
+    "supertest": "^6.3.3"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

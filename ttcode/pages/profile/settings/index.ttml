@@ -1,0 +1,126 @@
+﻿<view class="settings-page">
+  <view class="profile-card">
+    <view class="avatar-wrapper" bindtap="onChooseAvatar">
+      <image tt:if="{{userInfo.avatar}}" class="avatar-image" src="{{userInfo.avatar}}" mode="aspectFill"></image>
+      <view tt:else class="avatar-placeholder">{{userInfo.nickname ? userInfo.nickname.slice(0, 1) : '学'}}</view>
+      <view class="avatar-camera">
+        <text class="camera-icon">📷</text>
+      </view>
+    </view>
+    <view class="profile-info">
+      <text class="profile-name">{{userInfo.nickname || '学术研究者'}}</text>
+      <text class="profile-tip">点击相机图标更换头像</text>
+    </view>
+  </view>
+
+  <view class="quick-grid">
+    <view class="quick-item" bindtap="openPasswordModal">
+      <text class="quick-icon">🔐</text>
+      <view class="quick-texts">
+        <text class="quick-title">密码管理</text>
+        <text class="quick-desc">随时更新登录密码</text>
+      </view>
+    </view>
+    <view class="quick-item" bindtap="goNotice">
+      <text class="quick-icon">🔔</text>
+      <view class="quick-texts">
+        <text class="quick-title">通知中心</text>
+        <text class="quick-desc">管理系统与活动提醒</text>
+      </view>
+    </view>
+    <view class="quick-item" bindtap="goPrivacy">
+      <text class="quick-icon">🛡️</text>
+      <view class="quick-texts">
+        <text class="quick-title">隐私守护</text>
+        <text class="quick-desc">查看权限与数据政策</text>
+      </view>
+    </view>
+    <view class="quick-item" bindtap="goHelp">
+      <text class="quick-icon">💬</text>
+      <view class="quick-texts">
+        <text class="quick-title">帮助支持</text>
+        <text class="quick-desc">遇到问题立即咨询</text>
+      </view>
+    </view>
+  </view>
+
+  <view class="section-card">
+    <view class="section-header">
+      <text class="section-title">基本信息</text>
+      <text class="section-edit" bindtap="handleBasicEditTap">{{basicEditMode ? '取消' : '编辑'}}</text>
+    </view>
+
+    <view class="form-item">
+      <text class="form-label">用户名</text>
+      <input class="form-input" placeholder="请输入昵称" maxlength="50" value="{{basicEditMode ? basicForm.nickname : userInfo.nickname}}" disabled="{{!basicEditMode}}" bindinput="onBasicInput" data-field="nickname"></input>
+    </view>
+
+    <view class="form-item">
+      <text class="form-label">手机号</text>
+      <text class="form-static">{{userInfo.maskedPhone || '未绑定'}}</text>
+    </view>
+
+    <view class="form-item">
+      <text class="form-label">邮箱地址</text>
+      <input class="form-input" placeholder="user@example.com" value="{{basicEditMode ? basicForm.email : userInfo.email}}" disabled="{{!basicEditMode}}" bindinput="onBasicInput" data-field="email"></input>
+    </view>
+
+    <view tt:if="{{basicEditMode}}" class="form-actions">
+      <button class="primary-btn" loading="{{savingBasic}}" bindtap="saveBasicInfo">保存</button>
+      <button class="outline-btn" bindtap="cancelBasicEdit">取消</button>
+    </view>
+  </view>
+
+  <view class="section-card">
+    <view class="section-header">
+      <text class="section-title">账户安全</text>
+    </view>
+    <view class="action-item" bindtap="openPasswordModal">
+      <view class="action-texts">
+        <text class="action-title">修改登录密码</text>
+        <text class="action-desc">通过短信验证后修改密码</text>
+      </view>
+      <text class="action-arrow">›</text>
+    </view>
+    <view class="action-item" bindtap="onBindWechat">
+      <view class="action-texts">
+        <text class="action-title">绑定微信账号</text>
+        <text class="action-desc">用于快速登录和安全通知</text>
+      </view>
+      <text class="action-arrow">›</text>
+    </view>
+  </view>
+
+  <view tt:if="{{passwordModalVisible}}" class="modal-mask" catchtouchmove="noop">
+    <view class="modal-container">
+      <view class="modal-header">
+        <text class="modal-title">修改登录密码</text>
+        <text class="modal-close" bindtap="closePasswordModal">✕</text>
+      </view>
+      <view class="modal-body">
+        <view class="modal-item">
+          <text class="modal-label">短信验证码</text>
+          <view class="modal-code-row">
+            <input class="modal-input" type="number" maxlength="6" placeholder="请输入验证码" value="{{passwordForm.code}}" bindinput="onPasswordInput" data-field="code"></input>
+            <button class="code-btn" disabled="{{countdown > 0 || sendingCode}}" loading="{{sendingCode}}" bindtap="sendPasswordCode">
+              <text>{{countdown > 0 ? countdown + 's' : '发送验证码'}}</text>
+            </button>
+          </view>
+        </view>
+        <view class="modal-item">
+          <text class="modal-label">新密码</text>
+          <input class="modal-input" password placeholder="请输入新密码" value="{{passwordForm.newPassword}}" bindinput="onPasswordInput" data-field="newPassword"></input>
+        </view>
+        <view class="modal-item">
+          <text class="modal-label">确认密码</text>
+          <input class="modal-input" password placeholder="请再次输入新密码" value="{{passwordForm.confirmPassword}}" bindinput="onPasswordInput" data-field="confirmPassword"></input>
+        </view>
+      </view>
+      <view class="modal-actions">
+        <button class="primary-btn" loading="{{passwordSubmitting}}" bindtap="submitPasswordChange">确认保存</button>
+        <button class="outline-btn" bindtap="closePasswordModal">取消</button>
+      </view>
+    </view>
+  </view>
+</view>
+

@@ -1,0 +1,6 @@
+{
+  "navigationBarTitleText": "登录论文君",
+  "usingComponents": {
+    "privacy-popup": "../../components/privacy-popup/index"
+  }
+}

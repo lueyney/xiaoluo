@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="robots" content="noindex,nofollow">
+  <title>小珞AI 后台</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;700;800&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/admin/admin.css">
+</head>
+<body>
+  <section class="login-screen" id="loginScreen">
+    <div class="login-grid compact-login">
+      <div class="login-brand minimal-brand">
+        <div class="eyebrow">XIAOLUO AI</div>
+        <h1>后台登录</h1>
+        <p>请输入管理员账号与密码</p>
+      </div>
+      <div class="login-card">
+        <div class="login-card-head">
+          <h2>管理员登录</h2>
+          <p>欢迎回来</p>
+        </div>
+        <form id="loginForm" class="login-form">
+          <label>
+            <span>管理员账号</span>
+            <input id="loginUsername" type="text" value="admin" required>
+          </label>
+          <label>
+            <span>密码</span>
+            <input id="loginPassword" type="password" value="Admin@123" required>
+          </label>
+          <button type="submit" class="primary-btn large">登录</button>
+        </form>
+      </div>
+    </div>
+  </section>
+
+  <section class="admin-layout hidden" id="adminLayout">
+    <aside class="sidebar">
+      <div class="sidebar-brand panel-frame-dark">
+        <div class="eyebrow">XIAOLUO Admin Console</div>
+        <h2>小珞AI 中控台</h2>
+      </div>
+      <div class="sidebar-user panel-frame-dark" id="adminMeta"></div>
+
+      <nav class="nav-list" id="menu">
+        <div class="nav-group" data-group="workspace">
+          <button class="nav-group-title" data-role="group-toggle"><span>总览</span><span class="group-caret">▾</span></button>
+          <button class="nav-item active" data-section="dashboard"><span class="nav-icon">DB</span><span>经营总览</span></button>
+        </div>
+        <div class="nav-group" data-group="board">
+          <button class="nav-group-title" data-role="group-toggle"><span>数据看板</span><span class="group-caret">▾</span></button>
+          <button class="nav-item" data-section="users"><span class="nav-icon">US</span><span>用户分析</span></button>
+          <button class="nav-item" data-section="orders"><span class="nav-icon">OR</span><span>订单分析</span></button>
+          <button class="nav-item" data-section="payments"><span class="nav-icon">PY</span><span>支付分析</span></button>
+          <button class="nav-item" data-section="documents"><span class="nav-icon">DC</span><span>文档分析</span></button>
+        </div>
+        <div class="nav-group" data-group="sys">
+          <button class="nav-group-title" data-role="group-toggle"><span>系统协同</span><span class="group-caret">▾</span></button>
+          <a class="nav-item nav-link" href="/admin/workflows/"><span class="nav-icon">WF</span><span>工作流画板</span></a>
+          <button class="nav-item" data-section="notifications"><span class="nav-icon">NT</span><span>通知中心</span></button>
+          <button class="nav-item" data-section="system"><span class="nav-icon">SY</span><span>系统管理</span></button>
+        </div>
+      </nav>
+
+      <button class="ghost-btn full" id="logoutBtn">退出登录</button>
+    </aside>
+
+    <main class="main-panel">
+      <header class="console-header panel-frame">
+        <div class="console-topbar">
+          <div class="console-left">
+            <div class="console-toggle">☰</div>
+            <div class="breadcrumb-row">
+              <span>首页</span>
+              <span class="crumb-sep">/</span>
+              <span>权限管理</span>
+              <span class="crumb-sep">/</span>
+              <span id="sectionTitle">经营总览</span>
+            </div>
+          </div>
+          <div class="console-actions">
+            <div class="top-search"><input type="text" placeholder="搜索功能 / 指令"></div>
+            <span class="status-dot"></span>
+            <button class="header-icon" id="homeQuickBtn">HOME</button>
+            <button class="header-icon" id="layoutQuickBtn">LAY</button>
+            <button class="header-icon" id="settingsQuickBtn">SET</button>
+            <div class="user-pill">大伟</div>
+            <button class="primary-btn slim" id="refreshBtn">刷新页面</button>
+          </div>
+        </div>
+        <div class="console-tabs" id="consoleTabs">
+          <button class="console-tab active">按钮级别</button>
+          <button class="console-tab">菜单级别</button>
+          <button class="console-tab">数据效果</button>
+          <button class="console-tab">Dashboard</button>
+          <button class="console-tab">复制</button>
+          <button class="console-tab">水印</button>
+          <button class="console-tab">防抖</button>
+          <button class="console-tab">节流</button>
+        </div>
+      </header>
+
+      <div class="workspace-shell panel-frame">
+        <section class="panel-page active" id="section-dashboard">
+          <div class="workspace-titlebar">
+            <div>
+              <div class="eyebrow">ENTERPRISE CONSOLE</div>
+              <h1>经营总览</h1>
+            </div>
+            <div class="toolbar-row toolbar-top compact-toolbar">
+              <div class="toolbar-card date-card">
+                <label>开始日期<input id="startDate" type="date" value="2026-04-05"></label>
+              </div>
+              <div class="toolbar-card date-card">
+                <label>结束日期<input id="endDate" type="date" value="2026-04-11"></label>
+              </div>
+              <button class="primary-btn" id="applyDateBtn">应用日期</button>
+            </div>
+          </div>
+
+          <div class="summary-grid" id="summaryGrid"></div>
+
+          <div class="content-grid dashboard-grid">
+            <article class="panel-card hero-card wide-card">
+              <div class="card-head">
+                <div><div class="card-kicker">USER TREND</div><h3>用户趋势</h3></div>
+                <div class="legend-group"><span class="legend-dot cyan"></span>新增用户</div>
+              </div>
+              <div class="line-chart executive-line" id="userTrendChart"></div>
+            </article>
+
+            <article class="panel-card hero-card">
+              <div class="card-head">
+                <div><div class="card-kicker">ACTIVE USERS</div><h3>日活趋势</h3></div>
+                <div class="legend-group"><span class="legend-dot slate"></span>DAU</div>
+              </div>
+              <div class="line-chart executive-line active-line" id="activeTrendChart"></div>
+            </article>
+
+            <article class="panel-card">
+              <div class="card-head"><div><div class="card-kicker">CHANNEL MIX</div><h3>用户来源分布</h3></div></div>
+              <div class="donut-wrap clean-donut">
+                <div class="donut" id="channelDonut"></div>
+                <div class="donut-legend" id="channelLegend"></div>
+              </div>
+            </article>
+
+            <article class="panel-card">
+              <div class="card-head"><div><div class="card-kicker">BEHAVIOR DEPTH</div><h3>用户行为深度</h3></div></div>
+              <div class="bar-chart executive-bars" id="activityChart"></div>
+            </article>
+
+            <article class="panel-card">
+              <div class="card-head"><div><div class="card-kicker">REVENUE TREND</div><h3>收入走势</h3></div></div>
+              <div class="bar-chart executive-bars tall-bars" id="revenueChart"></div>
+            </article>
+
+            <article class="panel-card">
+              <div class="card-head"><div><div class="card-kicker">CONTENT OUTPUT</div><h3>内容产出</h3></div></div>
+              <div class="metric-list" id="outputStats"></div>
+            </article>
+          </div>
+        </section>
+
+        <section class="panel-page" id="section-users">
+          <div class="workspace-titlebar inner-page-title">
+            <div><div class="eyebrow">USER MANAGEMENT</div><h1>用户分析</h1></div>
+            <div class="toolbar-row compact-toolbar">
+              <div class="toolbar-card"><input id="userKeyword" type="text" placeholder="搜索手机号 / 昵称 / 邀请码"></div>
+              <button class="primary-btn" id="userSearchBtn">查询用户</button>
+            </div>
+          </div>
+          <div class="content-grid two-col slim-side">
+            <article class="panel-card"><div class="card-head"><div><div class="card-kicker">USER TABLE</div><h3>用户列表</h3></div></div><div id="usersTable"></div></article>
+            <article class="panel-card side-card"><div class="card-head"><div><div class="card-kicker">USER PROFILE</div><h3>用户画像</h3></div></div><div class="mini-stats" id="userProfiles"></div></article>
+          </div>
+        </section>
+
+        <section class="panel-page" id="section-orders">
+          <div class="workspace-titlebar inner-page-title"><div><div class="eyebrow">ORDER CENTER</div><h1>订单分析</h1></div></div>
+          <div class="content-grid two-col">
+            <article class="panel-card"><div class="card-head"><div><div class="card-kicker">ORDER TREND</div><h3>订单趋势</h3></div></div><div class="bar-chart tall executive-bars" id="orderTrendChart"></div></article>
+            <article class="panel-card"><div class="card-head"><div><div class="card-kicker">ORDER TABLE</div><h3>订单列表</h3></div></div><div id="ordersTable"></div></article>
+          </div>
+        </section>
+
+        <section class="panel-page" id="section-payments">
+          <div class="workspace-titlebar inner-page-title"><div><div class="eyebrow">PAYMENT CENTER</div><h1>支付分析</h1></div></div>
+          <div class="content-grid two-col">
+            <article class="panel-card"><div class="card-head"><div><div class="card-kicker">PAYMENT STRUCTURE</div><h3>支付状态分布</h3></div></div><div class="donut-wrap clean-donut compact"><div class="donut" id="paymentDonut"></div><div class="donut-legend" id="paymentLegend"></div></div></article>
+            <article class="panel-card"><div class="card-head"><div><div class="card-kicker">PAYMENT LIST</div><h3>支付记录</h3></div></div><div id="paymentsTable"></div></article>
+          </div>
+        </section>
+
+        <section class="panel-page" id="section-documents">
+          <div class="workspace-titlebar inner-page-title"><div><div class="eyebrow">DOCUMENT CENTER</div><h1>文档分析</h1></div></div>
+          <div class="content-grid two-col">
+            <article class="panel-card"><div class="card-head"><div><div class="card-kicker">DOCUMENT TYPE</div><h3>文档类型分布</h3></div></div><div class="bar-chart tall executive-bars" id="documentChart"></div></article>
+            <article class="panel-card"><div class="card-head"><div><div class="card-kicker">DOCUMENT LIST</div><h3>文档列表</h3></div></div><div id="documentsTable"></div></article>
+          </div>
+        </section>
+
+        <section class="panel-page" id="section-notifications">
+          <div class="workspace-titlebar inner-page-title"><div><div class="eyebrow">NOTICE CENTER</div><h1>通知中心</h1></div></div>
+          <div class="content-grid two-col">
+            <article class="panel-card">
+              <div class="card-head"><div><div class="card-kicker">SEND NOTICE</div><h3>通知投递</h3></div></div>
+              <form class="stack-form" id="notificationForm">
+                <input type="text" placeholder="通知标题" required>
+                <input type="text" placeholder="通知分类" required>
+                <textarea rows="6" placeholder="通知内容" required></textarea>
+                <button class="primary-btn" type="submit">发送通知</button>
+              </form>
+            </article>
+            <article class="panel-card"><div class="card-head"><div><div class="card-kicker">NOTICE LOG</div><h3>通知记录</h3></div></div><div id="notificationsTable"></div></article>
+          </div>
+        </section>
+
+        <section class="panel-page" id="section-system">
+          <div class="workspace-titlebar inner-page-title"><div><div class="eyebrow">SYSTEM CENTER</div><h1>系统管理</h1></div></div>
+          <div class="content-grid two-col">
+            <article class="panel-card"><div class="card-head"><div><div class="card-kicker">SYSTEM INFO</div><h3>环境信息</h3></div></div><pre class="code-block" id="systemInfo"></pre></article>
+            <article class="panel-card"><div class="card-head"><div><div class="card-kicker">ADMIN USERS</div><h3>管理员账户</h3></div></div><div class="admin-list" id="adminList"></div></article>
+          </div>
+        </section>
+      </div>
+    </main>
+  </section>
+
+  <div class="toast" id="toast"></div>
+  <script src="/admin/admin.js"></script>
+</body>
+</html>

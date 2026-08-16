@@ -1,0 +1,15 @@
+<view class="privacy-mask" tt:if="{{show}}">
+  <view class="privacy-content">
+    <view class="privacy-title">用户隐私保护提示</view>
+    <view class="privacy-text">
+      在使用本服务前，请您务必仔细阅读并同意
+      <text class="link" bindtap="openPrivacyContract">《用户隐私保护指引》</text>。
+      我们将严格保护您的个人信息安全。
+    </view>
+    <view class="privacy-btns">
+      <button class="btn-refuse" bindtap="handleDisagree">不同意</button>
+      <button class="btn-agree" bindtap="handleAgree">同意并继续</button>
+    </view>
+  </view>
+</view>
+

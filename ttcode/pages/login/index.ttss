@@ -1,0 +1,160 @@
+@charset "UTF-8";
+
+/* 环境提示 */
+.env-tips {
+  display: flex;
+  align-items: center;
+  gap: 20rpx;
+  padding: 24rpx 28rpx;
+  background: linear-gradient(135deg, #fff7ed 0%, #ffedd5 100%);
+  border-radius: 24rpx;
+  border: 2rpx solid #fed7aa;
+}
+
+.env-tips__icon {
+  font-size: 48rpx;
+  flex-shrink: 0;
+}
+
+.env-tips__content {
+  display: flex;
+  flex-direction: column;
+  gap: 8rpx;
+}
+
+.env-tips__title {
+  font-size: 28rpx;
+  font-weight: 700;
+  color: #9a3412;
+}
+
+.env-tips__desc {
+  font-size: 24rpx;
+  color: #c2410c;
+  line-height: 1.5;
+}
+
+/* 微信登录区域 */
+.wechat-login-area {
+  display: flex;
+  flex-direction: column;
+  gap: 32rpx;
+  padding: 20rpx 0;
+}
+
+.wechat-login-tips {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16rpx;
+  padding: 40rpx 20rpx;
+  background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%);
+  border-radius: 24rpx;
+  border: 2rpx solid #bae6fd;
+}
+
+.wechat-login-tips__icon {
+  font-size: 64rpx;
+}
+
+.wechat-login-tips__title {
+  font-size: 32rpx;
+  font-weight: 700;
+  color: #0c4a6e;
+}
+
+.wechat-login-tips__desc {
+  font-size: 26rpx;
+  color: #475569;
+  text-align: center;
+  line-height: 1.6;
+}
+
+.wechat-login-btn {
+  width: 100%;
+  height: 100rpx;
+  border-radius: 32rpx;
+  border: none;
+  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+  color: #ffffff;
+  font-size: 32rpx;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16rpx;
+  box-shadow: 0 24rpx 48rpx rgba(16, 185, 129, 0.35);
+}
+
+/* 开发模式按钮样式 */
+.wechat-login-btn--dev {
+  background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+  box-shadow: 0 24rpx 48rpx rgba(245, 158, 11, 0.35);
+}
+
+.wechat-login-btn[disabled] {
+  background: #94a3b8;
+  box-shadow: none;
+  opacity: 0.6;
+}
+
+.wechat-login-btn__icon {
+  font-size: 36rpx;
+}
+
+.wechat-login-btn__text {
+  font-size: 32rpx;
+}
+
+.privacy-wrapper {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12rpx;
+  padding: 16rpx;
+}
+
+.privacy-text {
+  font-size: 26rpx;
+  color: #64748b;
+}
+
+.privacy-link {
+  font-size: 26rpx;
+  color: #2563eb;
+  font-weight: 600;
+  text-decoration: underline;
+}
+
+.form-field__label--inline{display:flex;justify-content:space-between;align-items:center}
+.login-page{min-height:100vh;padding:80rpx 40rpx 120rpx;background:linear-gradient(180deg,#f5f7ff 0%,#eef2ff 45%,#ffffff 100%);display:flex;flex-direction:column;align-items:center;box-sizing:border-box}
+.login-hero{display:flex;flex-direction:column;align-items:center;text-align:center;margin-bottom:60rpx;color:#1e293b}
+.login-hero__icon{width:160rpx;height:160rpx;margin-bottom:32rpx;font-size:120rpx;display:flex;align-items:center;justify-content:center;border-radius:40rpx}
+.login-hero__title{font-size:56rpx;font-weight:700;color:#1e40af;margin-bottom:16rpx}
+.login-hero__subtitle{font-size:28rpx;color:#475569;line-height:1.6;margin:0 24rpx}
+.login-card{width:100%;background:#ffffff;border-radius:36rpx;padding:48rpx 40rpx;box-shadow:0 32rpx 80rpx rgba(79,70,229,0.15);display:flex;flex-direction:column;gap:32rpx;box-sizing:border-box}
+.login-tabs{display:flex;background:#f1f5f9;border-radius:28rpx;padding:8rpx}
+.login-tabs__item{flex:1;text-align:center;font-size:28rpx;height:88rpx;line-height:88rpx;border-radius:22rpx;color:#64748b;font-weight:600}
+.login-tabs__item--active{background:linear-gradient(135deg,#2563eb 0%,#9333ea 100%);color:#ffffff;box-shadow:0 16rpx 36rpx rgba(79,70,229,0.25)}
+.login-tabs__item:not(.login-tabs__item--active){background:transparent}
+.form-field{display:flex;flex-direction:column;gap:16rpx}
+.form-field__label{font-size:28rpx;color:#334155;font-weight:600}
+.form-input{height:96rpx;border-radius:28rpx;border:1rpx solid rgba(148,163,184,0.4);background:#f8fafc;display:flex;align-items:center;padding:0 28rpx;gap:20rpx;box-shadow:inset 0 0 0 1rpx rgba(148,163,184,0.1)}
+.form-input__icon{font-size:32rpx;color:#6366f1}
+.form-input__control{flex:1;height:100%;font-size:30rpx;color:#1f2937}
+.form-input__suffix{font-size:30rpx;color:#94a3b8}
+.form-input__suffix--link{color:#2563eb;font-weight:600}
+.login-btn{width:100%;height:100rpx;border-radius:32rpx;border:none;background:linear-gradient(135deg,#2563eb 0%,#7c3aed 50%,#9333ea 100%);color:#ffffff;font-size:32rpx;font-weight:700;display:flex;align-items:center;justify-content:center;box-shadow:0 24rpx 48rpx rgba(124,58,237,0.35)}
+.login-extra{display:flex;justify-content:center;gap:12rpx;font-size:26rpx;color:#64748b}
+.login-extra__link{color:#2563eb;font-weight:600}
+.login-extra__link--active{opacity:0.7}
+.form-hint{margin-top:12rpx;font-size:24rpx;color:#64748b;line-height:1.5}
+.login-features{margin-top:48rpx;width:100%;display:flex;flex-direction:column;gap:24rpx}
+.login-feature{display:flex;align-items:center;gap:24rpx;padding:24rpx 28rpx;background:rgba(248,250,252,0.92);border-radius:28rpx;box-shadow:0 18rpx 44rpx rgba(15,23,42,0.12)}
+.login-feature__icon{width:68rpx;height:68rpx;border-radius:24rpx;display:flex;align-items:center;justify-content:center;font-size:36rpx;color:#ffffff}
+.login-feature__icon--ai{background:linear-gradient(135deg,#6366f1,#8b5cf6)}
+.login-feature__icon--multi{background:linear-gradient(135deg,#38bdf8,#0ea5e9)}
+.login-feature__icon--rewrite{background:linear-gradient(135deg,#22c55e,#16a34a)}
+.login-feature__content{display:flex;flex-direction:column;gap:8rpx}
+.login-feature__title{font-size:30rpx;font-weight:600;color:#1f2937}
+.login-feature__desc{font-size:26rpx;color:#64748b}

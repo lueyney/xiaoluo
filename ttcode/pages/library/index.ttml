@@ -1,0 +1,102 @@
+<view class="library-page">
+  <!-- 顶部品牌卡片（含搜索栏） -->
+  <view class="top-card">
+    <view class="top-card__row">
+      <view class="top-card__brand">
+        <image class="top-card__icon" src="/assets/app-logo.png" mode="aspectFill"></image>
+        <view class="top-card__info">
+          <text class="top-card__name">文档库</text>
+          <text class="top-card__desc">我的全部生成文档</text>
+        </view>
+      </view>
+      <view class="credit-chip">
+        <text class="credit-value">{{filteredDocs.length}}</text>
+        <text class="credit-unit">篇</text>
+      </view>
+    </view>
+
+    <!-- 搜索栏放在卡片内，避免与列表重叠 -->
+    <view class="search-bar-simple">
+      <input class="search-input" placeholder="搜索文档..." bindinput="onSearchInput" value="{{searchValue}}" />
+      <button class="filter-trigger" bindtap="openTypePicker">{{selectedType}}</button>
+    </view>
+  </view>
+
+  <view tt:if="{{errorMessage}}" class="error-banner">
+    <text>{{errorMessage}}</text>
+  </view>
+
+  <!-- 统计卡片 -->
+  <view class="stats-section">
+    <view class="stats-card">
+      <view class="stats-item">
+        <text class="stats-value">{{filteredDocs.length}}</text>
+        <text class="stats-label">文档总数</text>
+      </view>
+      <view class="stats-divider"></view>
+      <view class="stats-item">
+        <text class="stats-value">{{totalWords}}</text>
+        <text class="stats-label">累计字数</text>
+      </view>
+    </view>
+  </view>
+
+  <!-- 文档列表 -->
+  <scroll-view scroll-y="true" class="documents-scroll">
+    <view class="documents-scroll__inner">
+      <view tt:if="{{filteredDocs.length === 0}}" class="empty-state">
+        <text class="empty-icon">📝</text>
+        <text class="empty-title">暂无文档</text>
+        <text class="empty-tip">去创作内容或导入资料吧</text>
+        <button class="primary-btn" bindtap="goToWriting">开始创作</button>
+      </view>
+
+      <block tt:for="{{filteredDocs}}" tt:key="id">
+        <view class="doc-card">
+          <!-- 类型角标 -->
+          <view class="doc-card__badge" style="background: {{item.badgeColor || 'linear-gradient(135deg,#818cf8,#a78bfa)'}};">
+            <text>{{item.type}}</text>
+          </view>
+
+          <!-- NEW 角标 -->
+          <view tt:if="{{item.isNew}}" class="doc-card__new-badge">
+            <text>新</text>
+          </view>
+
+          <!-- 主体 -->
+          <view class="doc-card__body">
+            <view class="doc-card__header">
+              <text class="doc-card__title">{{item.title}}</text>
+              <text class="doc-card__meta">{{item.createdAt}} · {{item.wordCount}} 字</text>
+            </view>
+            <text class="doc-card__preview">{{item.preview}}</text>
+          </view>
+
+          <!-- 生成中状态 -->
+          <view tt:if="{{item.status === 'processing' || item.status === 'pending'}}" class="doc-card__progress">
+            <text class="progress-label">⏳ 生成中...</text>
+            <view class="progress-bar-wrap">
+              <view class="progress-bar-inner" style="width: 60%;"></view>
+            </view>
+          </view>
+
+          <!-- 失败状态 -->
+          <view tt:if="{{item.status === 'failed'}}" class="doc-card__fail">
+            <text class="fail-icon">⚠️</text>
+            <text class="fail-text">生成失败，请重试</text>
+          </view>
+
+          <!-- 操作按钮 -->
+          <view class="doc-card__footer">
+            <button class="outline-btn" data-id="{{item.id}}" bindtap="onViewDoc">👁 查看</button>
+            <button class="outline-btn" data-id="{{item.id}}" bindtap="onCopyDoc">📋 复制</button>
+            <button class="delete-btn" data-id="{{item.id}}" bindtap="onDeleteDoc">🗑 删除</button>
+          </view>
+        </view>
+      </block>
+    </view>
+  </scroll-view>
+
+  <!-- 手机号一键登录弹窗 -->
+  <phone-login-modal show="{{showPhoneLoginModal}}" bind:close="onPhoneLoginClose" bind:success="onPhoneLoginSuccess"></phone-login-modal>
+</view>

@@ -1,0 +1,41 @@
+﻿<view class="preview-page">
+  <view tt:if="{{loading}}" class="loading-container">
+    <text class="loading-text">加载中...</text>
+  </view>
+  
+  <view tt:else class="preview-container">
+    <!-- 文档头部 -->
+    <view class="doc-header">
+      <view class="doc-title">{{document.title}}</view>
+      <view class="doc-meta">
+        <view class="meta-item">
+          <text class="meta-icon">📄</text>
+          <text class="meta-text">{{document.type}}</text>
+        </view>
+        <view class="meta-item">
+          <text class="meta-icon">📊</text>
+          <text class="meta-text">{{document.word_count}} 字</text>
+        </view>
+        <view class="meta-item">
+          <text class="meta-icon">🕒</text>
+          <text class="meta-text">{{document.created_at}}</text>
+        </view>
+      </view>
+    </view>
+    
+    <!-- 文档内容 -->
+    <scroll-view scroll-y="true" class="doc-content-scroll">
+      <view class="doc-content">
+        <text class="content-text">{{document.content}}</text>
+      </view>
+    </scroll-view>
+    
+    <!-- 底部操作栏 -->
+    <view class="doc-actions">
+      <button class="action-btn action-btn--secondary" bindtap="onGoBack">返回</button>
+      <button class="action-btn action-btn--primary" bindtap="onCopy">复制</button>
+      <button class="action-btn action-btn--primary" bindtap="onExportWord">导出</button>
+    </view>
+  </view>
+</view>
+

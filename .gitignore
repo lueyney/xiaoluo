@@ -1,43 +1,65 @@
-# 依赖
-node_modules/
-package-lock.json
-
-# 环境变量（包含敏感信息）
+# Dependencies and local environment
+**/node_modules/
 .env
-backend-code/.env
+.env.*
+!.env.example
+!.env.sample
 
-# 日志
-logs/
-*.log
-backend-code/logs/
+# Logs, caches, temporary files, and local service data
+**/logs/
+**/*.log
+**/tmp/
+**/__pycache__/
+*.pyc
+backend-code/data/
+backend-code/exports/
+backmager/data/
+backmager/logs/
+_codex-backups/
+versions/
+作品集/
+docx-render-test/
+docx-render-test2/
+backend-code/pdf-*
+backend-code/report.pdf
+backend-code/stdout-*.json
+web-frontend/admin/workflows/assets/*
+!web-frontend/admin/workflows/assets/index-BVHLU9Rc.js
+!web-frontend/admin/workflows/assets/index-CGSDsbie.css
 
-# 临时文件
+# Build/editor/system files
+**/dist/
+**/build/
 .DS_Store
 Thumbs.db
-*.tmp
-*.temp
-
-# 编辑器
 .vscode/
 .idea/
 *.swp
 *.swo
+*.tmp
+*.temp
 
-# 构建产物
-dist/
-build/
-
-# 上传文件
-uploads/
-backend-code/uploads/
-
-# 微信开发者工具
-.wechat/
-project.config.json
-project.private.config.json
-
-# 微信支付证书文件（敏感信息）
+# Credentials and private mini-program settings
 *.pem
-backend-code/certs/*.pem
-backend-code/certs/*.p12
+*.p12
+*.key
+*.crt
+project.private.config.json
+**/certs/
 
+# Desktop workspace scratch files (only at repository root)
+/*.pdf
+/*.docx
+/*.csv
+/*.json
+/*.txt
+/*.jpg
+/*.jpeg
+/*.py
+/*.ps1
+/*.bak
+/*.log
+/*.md
+!/README.md
+/*.js
+!/app.js

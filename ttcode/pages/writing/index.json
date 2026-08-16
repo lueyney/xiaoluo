@@ -1,0 +1,6 @@
+{
+  "navigationBarTitleText": "AI智能创作",
+  "usingComponents": {
+    "phone-login-modal": "/components/phone-login-modal/index"
+  }
+}

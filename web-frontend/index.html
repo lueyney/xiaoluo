@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="baidu-site-verification" content="codeva-YABfsPIcnw" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="小珞AI、小珞、AI小珞论文写作平台，提供AI论文写作、论文降重、开题报告、文献综述、任务书与答辩稿生成服务。">
+    <meta name="keywords" content="小珞,AI小珞,小珞AI,论文写作,AI写作,论文降重,开题报告,文献综述,任务书,答辩稿">
+    <title>小珞AI - AI小珞论文写作与降重助手</title>
+    
+    <!-- Favicon -->
+    <link rel="icon" type="image/png" href="assets/app-logo.png">
+    
+    <link rel="stylesheet" href="css/main.css">
+    <link rel="stylesheet" href="css/theme.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/html2pdf.js@0.10.1/dist/html2pdf.bundle.min.js"></script>
+</head>
+<body>
+    <!-- 导航栏 -->
+    <nav class="navbar" id="navbar">
+        <div class="container">
+            <button class="nav-brand" id="brandButton" type="button" aria-label="返回起始页">
+                <img src="assets/app-logo.png" alt="AI小珞" style="width:32px;height:32px;border-radius:50%;margin-right:8px;">
+                <span>AI小珞</span>
+            </button>
+            <div class="nav-menu" id="navMenu">
+                <a href="#home" class="nav-link active" data-page="home">首页</a>
+                <a href="#writing" class="nav-link" data-page="writing">创作</a>
+                <a href="#library" class="nav-link" data-page="library" data-auth-only>文档库</a>
+                <a href="#rewrite" class="nav-link" data-page="rewrite">AI降重</a>
+                <a href="#document-rewrite" class="nav-link" data-page="document-rewrite">文档降重</a>
+                <a href="#orders" class="nav-link" data-page="orders" data-auth-only>订单</a>
+            </div>
+            <div class="nav-actions">
+                <button class="theme-toggle" id="themeToggle" type="button" aria-label="切换主题" title="切换到亮色模式">
+                    <span class="theme-toggle-orbit" aria-hidden="true"></span>
+                    <i class="fas fa-sun theme-toggle-icon" aria-hidden="true"></i>
+                    <span class="theme-toggle-label">换肤</span>
+                </button>
+                <div class="user-info" id="userInfo" style="display: none;">
+                    <span class="credits-badge">
+                        <i class="fas fa-coins"></i>
+                        <span id="userCredits">0</span>
+                    </span>
+                    <div class="account-menu-wrap">
+                        <button class="account-avatar-btn" id="accountMenuButton" type="button" aria-label="打开账户菜单" aria-controls="accountMenu" aria-expanded="false">
+                            <span class="account-avatar-letter" id="accountAvatarLetter">用</span>
+                        </button>
+                        <div class="account-menu" id="accountMenu" hidden>
+                            <div class="account-menu-user">
+                                <strong id="username">用户</strong>
+                                <span>我的邀请码</span>
+                            </div>
+                            <div class="account-menu-code">
+                                <code id="navInviteCode">--</code>
+                                <button type="button" id="copyNavInviteCode" aria-label="复制邀请码" title="复制邀请码"><i class="fas fa-copy"></i></button>
+                            </div>
+                            <button class="account-menu-logout" id="accountLogoutButton" type="button"><i class="fas fa-arrow-right-from-bracket"></i><span>退出登录</span></button>
+                        </div>
+                    </div>
+                </div>
+                <button class="btn btn-primary" id="loginBtn">登录</button>
+            </div>
+            <button class="nav-toggle" id="navToggle">
+                <i class="fas fa-bars"></i>
+            </button>
+        </div>
+    </nav>
+
+    <!-- 主内容区 -->
+    <main class="main-content" id="mainContent">
+        <!-- 页面内容将通过JavaScript动态加载 -->
+    </main>
+
+    <!-- 登录/注册模态框 -->
+    <div class="modal" id="authModal">
+        <div class="modal-content">
+            <button class="modal-close" id="modalClose">
+                <i class="fas fa-times"></i>
+            </button>
+            <div class="auth-container">
+                <div class="auth-tabs">
+                    <button class="auth-tab active" data-tab="login">登录</button>
+                    <button class="auth-tab" data-tab="register">注册</button>
+                </div>
+                
+                <!-- 登录表单 -->
+                <form class="auth-form active" id="loginForm">
+                    <h2>欢迎回来</h2>
+                    <div class="form-group">
+                        <label>手机号</label>
+                        <input type="tel" id="loginPhone" placeholder="请输入手机号" inputmode="numeric" autocomplete="username" maxlength="11" pattern="[0-9]{11}" required>
+                    </div>
+                    <div class="form-group" id="loginPasswordGroup">
+                        <label>密码</label>
+                        <input type="password" id="loginPassword" placeholder="请输入密码" required>
+                    </div>
+                    <div class="form-group" id="loginCodeGroup" style="display:none;">
+                        <label>验证码</label>
+                        <div class="input-group">
+                            <input type="text" id="loginCode" placeholder="请输入验证码" maxlength="6">
+                            <button type="button" class="btn btn-secondary" id="sendLoginCodeBtn">发送验证码</button>
+                        </div>
+                    </div>
+                    <button type="submit" class="btn btn-primary btn-block" id="loginSubmitBtn">登录</button>
+                    <div class="auth-divider">或</div>
+                    <button type="button" class="btn btn-secondary btn-block" id="smsLoginBtn">验证码登录</button>
+                </form>
+
+                <!-- 注册表单 -->
+                <form class="auth-form" id="registerForm">
+                    <h2>创建账号</h2>
+                    <div class="form-group">
+                        <label>手机号</label>
+                        <input type="tel" id="registerPhone" placeholder="请输入手机号" inputmode="numeric" autocomplete="tel" maxlength="11" pattern="[0-9]{11}" required>
+                    </div>
+                    <div class="form-group">
+                        <label>验证码</label>
+                        <div class="input-group">
+                            <input type="text" id="registerCode" placeholder="请输入验证码" required>
+                            <button type="button" class="btn btn-secondary" id="sendCodeBtn">发送验证码</button>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label>密码</label>
+                        <input type="password" id="registerPassword" placeholder="请设置密码（6-20位）" minlength="6" maxlength="20" required>
+                    </div>
+                    <div class="form-group">
+                        <label>确认密码</label>
+                        <input type="password" id="registerPasswordConfirm" placeholder="请再次输入密码" maxlength="20" required>
+                    </div>
+                    <div class="form-group auth-agree">
+                        <label class="auth-agree-label">
+                            <input type="checkbox" id="registerAgree">
+                            <span>我已阅读并同意 <a href="#" onclick="return false;">用户协议</a> 与 <a href="#" onclick="return false;">隐私政策</a></span>
+                        </label>
+                    </div>
+                    <button type="submit" class="btn btn-primary btn-block">注册</button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast 提示 -->
+    <div class="toast" id="toast"></div>
+
+    <!-- 加载指示器 -->
+    <div class="loading-overlay" id="loadingOverlay">
+        <div class="loading-spinner"></div>
+        <div class="loading-text">加载中...</div>
+    </div>
+
+    <!-- JavaScript -->
+    <script src="js/config.js"></script>
+    <script src="js/utils.js"></script>
+    <script src="js/api.js"></script>
+    <script src="js/auth.js"></script>
+    <script src="js/router.js"></script>
+    <script src="js/pages/home.js"></script>
+    <script src="js/pages/writing.js"></script>
+    <script src="js/pages/library.js"></script>
+    <script src="js/pages/rewrite.js?v=20260815-credit-rate"></script>
+    <script src="js/pages/document-rewrite.js?v=20260813-rate-limit-backoff"></script>
+    <script src="js/pages/orders.js"></script>
+    <script src="js/pages/jianli.js"></script>
+    <script src="js/app.js"></script>
+</body>
+</html>

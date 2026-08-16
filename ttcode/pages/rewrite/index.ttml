@@ -1,0 +1,187 @@
+<view class="rewrite-page">
+  <view class="info-card">
+    <view class="info-header">
+      <view class="info-title">
+        <text class="info-name">AI智能降重</text>
+        <text class="info-subtitle">AI智能降重，保持原意的同时显著降低重复率</text>
+      </view>
+      <view class="info-credits">
+        <text class="credits-icon">💎</text>
+        <text class="credits-value">{{credits}}</text>
+      </view>
+    </view>
+  </view>
+
+  <view class="feature-group">
+    <block tt:for="{{featureList}}" tt:key="title">
+      <view class="feature-card">
+        <view class="feature-icon" style="background: {{item.bg}}; color: {{item.color}};">{{item.icon}}</view>
+        <text class="feature-title">{{item.title}}</text>
+        <text class="feature-desc">{{item.desc}}</text>
+      </view>
+    </block>
+  </view>
+
+  <scroll-view scroll-y="true" class="content-scroll">
+    <view class="content-scroll__inner">
+      <view class="settings-card">
+        <view class="settings-header">
+          <text class="settings-title">降重设置</text>
+          <text class="settings-caption">配置降重参数以获得最佳效果</text>
+        </view>
+
+        <view class="setting-list">
+          <view class="setting-item">
+            <view class="setting-label">
+              <text class="setting-label-title">学科领域（可选）</text>
+              <text class="setting-hint">选择学科领域以获得更精准的降重效果</text>
+            </view>
+            <picker mode="selector" range="{{disciplines}}" value="{{disciplineIndex}}" bindchange="onDisciplineChange">
+              <view class="setting-picker">
+                <text>{{disciplines[disciplineIndex]}}</text>
+                <text class="picker-arrow">▾</text>
+              </view>
+            </picker>
+          </view>
+
+          <view class="setting-item">
+            <view class="setting-label">
+              <text class="setting-label-title">语言类型</text>
+            </view>
+            <picker mode="selector" range="{{languages}}" value="{{languageIndex}}" bindchange="onLanguageChange">
+              <view class="setting-picker">
+                <text>{{languages[languageIndex]}}</text>
+                <text class="picker-arrow">▾</text>
+              </view>
+            </picker>
+          </view>
+
+          <view class="setting-item">
+            <view class="setting-row">
+              <text class="setting-label-title">降重模式</text>
+              <switch checked="{{modeEnabled}}" bindchange="onToggleMode"></switch>
+            </view>
+            <text class="setting-hint">降低 AIGC 检测率（推荐）</text>
+          </view>
+
+          <view class="setting-item">
+            <view class="setting-label">
+              <text class="setting-label-title">检测平台</text>
+            </view>
+            <picker mode="selector" range="{{platforms}}" value="{{platformIndex}}" bindchange="onPlatformChange">
+              <view class="setting-picker">
+                <text>{{platforms[platformIndex]}}</text>
+                <text class="picker-arrow">▾</text>
+              </view>
+            </picker>
+          </view>
+        </view>
+      </view>
+
+      <view class="input-card">
+        <view class="input-header">
+          <text class="input-title">输入要降重的文本</text>
+          <text class="input-caption">支持论文、报告等各类学术文本</text>
+        </view>
+        <textarea class="input-textarea" placeholder="请粘贴需要降重的文本内容，支持中英文混合..." maxlength="10000" value="{{originalText}}" bindinput="onTextInput"></textarea>
+        <view class="input-footer">
+          <text class="footer-count">当前字数：{{wordCount}}</text>
+          <text class="footer-cost">预计费用：{{expectedCost}} 积分</text>
+        </view>
+      </view>
+
+      <view class="action-section">
+        <button tt:if="{{!isRewriting}}" class="{{startButtonClass}}" disabled="{{disableStart}}" bindtap="startRewrite">
+          <text class="generate-icon">✨</text>
+          <text class="generate-text">开始AI降重</text>
+          <text tt:if="{{!disableStart}}" class="generate-arrow">→</text>
+        </button>
+        <button tt:if="{{isRewriting && !isPaused}}" class="generate-btn pause-active-btn" bindtap="pauseRewrite">
+          <text class="generate-icon">⏸</text>
+          <text class="generate-text">暂停降重</text>
+        </button>
+        <button tt:if="{{isRewriting && isPaused}}" class="generate-btn resume-active-btn" bindtap="resumeRewrite">
+          <text class="generate-icon">▶</text>
+          <text class="generate-text">继续降重</text>
+        </button>
+      </view>
+
+      <view class="tips-card">
+        <view class="tips-header">
+          <text class="tips-icon">⚠️</text>
+          <text class="tips-title">使用提醒</text>
+        </view>
+        <text class="tip-item">AI降重后请务必人工检查，确保语义准确</text>
+        <text class="tip-item">建议降重后进行适当的人工优化和调整</text>
+        <text class="tip-item">相似度检测结果仅供参考，最终以学校检测为准</text>
+        <text class="tip-item">查看检测对接教程，维普、万方等主流平台</text>
+      </view>
+
+      <view tt:if="{{isRewriting}}" class="section-card progress-card">
+        <view class="progress-header">
+          <text class="progress-title">{{isPaused ? "已暂停" : "降重进行中"}}</text>
+          <text class="progress-percent">{{progress}}%</text>
+        </view>
+        <progress percent="{{progress}}" stroke-width="6" active />
+      </view>
+
+      <view tt:if="{{rewrittenText}}" class="section-card result-card">
+        <view class="result-header">
+          <view class="result-title-group">
+            <text class="result-title">✨ 降重结果</text>
+            <view class="result-stats">
+              <view class="stat-item">
+                <text class="stat-label">原文</text>
+                <text class="stat-value">{{wordCount}}字</text>
+              </view>
+              <text class="stat-divider">→</text>
+              <view class="stat-item">
+                <text class="stat-label">降重后</text>
+                <text class="stat-value">{{rewrittenText.length}}字</text>
+              </view>
+              <text class="stat-divider">|</text>
+              <view class="stat-item highlight">
+                <text class="stat-label">相似度</text>
+                <text class="stat-value similarity">{{similarity}}%</text>
+              </view>
+            </view>
+          </view>
+        </view>
+        
+        <view class="result-comparison">
+          <view class="comparison-item">
+            <view class="comparison-header">
+              <text class="comparison-title">📄 原文</text>
+              <text class="comparison-count">{{wordCount}}字</text>
+            </view>
+            <textarea class="comparison-textarea original" value="{{originalText}}" disabled></textarea>
+          </view>
+          
+          <view class="comparison-arrow">
+            <text class="arrow-icon">↓</text>
+            <text class="arrow-text">AI降重</text>
+          </view>
+          
+          <view class="comparison-item">
+            <view class="comparison-header">
+              <text class="comparison-title">✨ 降重后</text>
+              <text class="comparison-count">{{rewrittenText.length}}字</text>
+            </view>
+            <textarea class="comparison-textarea rewritten" value="{{rewrittenText}}" disabled></textarea>
+          </view>
+        </view>
+        
+        <view class="result-actions">
+          <button class="action-btn primary" bindtap="saveRewrittenText">
+            <text class="btn-icon">💾</text>
+            <text class="btn-text">保存文档</text>
+          </button>
+          <button class="action-btn secondary" bindtap="copyToClipboard">
+            <text class="btn-icon">📋</text>
+            <text class="btn-text">复制文本</text>
+          </button>
+        </view>
+      </view>
+    </view>
+  </scroll-view>
+</view>

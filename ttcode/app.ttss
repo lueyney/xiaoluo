@@ -1,0 +1,3 @@
+page, view, text, button {
+  box-sizing: border-box;
+}

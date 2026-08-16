@@ -1,0 +1,94 @@
+<view class="orders-page">
+  <!-- 顶部余额卡片 -->
+  <view class="compact-header">
+    <view class="header-row">
+      <view class="header-info">
+        <text class="header-label">当前余额</text>
+        <view class="header-value-row">
+          <text class="header-value">{{summary.credits}}</text>
+          <text class="header-unit">积分</text>
+        </view>
+      </view>
+      <button class="recharge-btn-compact" bindtap="goToRecharge">
+        <text class="btn-icon">⚡</text>
+        <text>充值积分</text>
+      </button>
+    </view>
+    <view class="quick-stats">
+      <text class="quick-stat">总订单 {{summary.total || 0}}</text>
+      <text class="stat-dot">•</text>
+      <text class="quick-stat">已完成 {{summary.completed || 0}}</text>
+    </view>
+    <view class="first-tip" bindtap="goToRecharge">
+      <text class="first-tip-text">🎁 首充1元享50积分，立即体验</text>
+    </view>
+  </view>
+
+  <!-- Tab 切换 -->
+  <view class="tab-bar">
+    <block tt:for="{{tabs}}" tt:key="value">
+      <view class="tab-item {{item.value === activeTab ? 'active' : ''}}" data-value="{{item.value}}" bindtap="onTabChange">
+        <text>{{item.label}}</text>
+      </view>
+    </block>
+  </view>
+
+  <!-- 订单列表 -->
+  <scroll-view scroll-y="true" class="order-scroll">
+    <view class="order-scroll__inner">
+      <view tt:if="{{filteredOrders.length === 0}}" class="empty-state">
+        <text class="empty-icon">📄</text>
+        <text class="empty-title">暂无相关订单</text>
+        <text class="empty-tip">去生成内容或充值积分吧</text>
+        <button class="primary-btn" bindtap="goToRecharge">前往充值</button>
+      </view>
+
+      <block tt:for="{{filteredOrders}}" tt:key="id">
+        <view class="order-card">
+          <!-- 状态色条 -->
+          <view class="order-card__strip" style="background: {{item.statusColor}};"></view>
+
+          <view class="order-header">
+            <view class="order-icon">📝</view>
+            <view class="order-title-group">
+              <text class="order-title">{{item.type}}</text>
+              <view class="order-tags">
+                <text class="order-status" style="color: {{item.statusColor}}; background: {{item.statusBg}};">{{item.statusText}}</text>
+              </view>
+            </view>
+          </view>
+
+          <view class="order-doc-types" tt:if="{{item.docTypeTags && item.docTypeTags.length > 0}}">
+            <text class="doc-types-label">生成类型：</text>
+            <view class="doc-types-list">
+              <block tt:for="{{item.docTypeTags}}" tt:key="label" tt:for-item="tag">
+                <text class="doc-type-tag" style="color: {{tag.color}}; background: {{tag.bg}};">{{tag.label}}</text>
+              </block>
+            </view>
+          </view>
+
+          <view class="order-body">
+            <view class="order-info">
+              <view class="info-row">
+                <text class="info-label">消耗积分</text>
+                <text class="info-value credits">{{item.credits}} 积分</text>
+              </view>
+              <view class="info-row">
+                <text class="info-label">订单金额</text>
+                <text class="info-value amount">¥{{item.amount}}</text>
+              </view>
+            </view>
+          </view>
+
+          <view class="order-footer">
+            <text class="footer-time">🕐 {{item.createdAt}}</text>
+            <text class="footer-finish" tt:if="{{item.finishedAt}}">完成 {{item.finishedAt}}</text>
+          </view>
+        </view>
+      </block>
+    </view>
+  </scroll-view>
+
+  <!-- 手机号一键登录弹窗 -->
+  <phone-login-modal show="{{showPhoneLoginModal}}" bind:close="onPhoneLoginClose" bind:success="onPhoneLoginSuccess"></phone-login-modal>
+</view>

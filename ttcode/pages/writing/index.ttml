@@ -1,0 +1,258 @@
+<view class="writing-page">
+  <!-- 顶部品牌卡片 -->
+  <view class="top-card">
+    <view class="top-card__row">
+      <view class="top-card__brand">
+        <image class="top-card__icon" src="/assets/app-logo.png" mode="aspectFill"></image>
+        <view class="top-card__info">
+          <text class="top-card__name">论文君</text>
+          <text class="top-card__desc">AI智能写作平台</text>
+        </view>
+      </view>
+      <view class="top-card__credit" bindtap="navigateToRecharge">
+        <view class="credit-chip">
+          <text class="credit-icon">💎</text>
+          <text class="credit-value">{{credits}}</text>
+          <text class="credit-unit">积分</text>
+        </view>
+      </view>
+    </view>
+    <text class="top-card__slogan">灵感不再转瞬即逝，让 AI 帮你延展每一个想法</text>
+    <view class="top-card__actions">
+      <view class="sample-button" bindtap="goToLibrary">
+        <text class="sample-icon">👀</text>
+        <text class="sample-text">查看示例</text>
+      </view>
+    </view>
+  </view>
+
+  <scroll-view scroll-y="true" class="content-scroll" enhanced="true" bounces="true">
+    <view class="content-scroll__inner">
+
+      <!-- 基本信息 -->
+      <view class="section-card">
+        <view class="section-header">
+          <view class="section-icon-wrap">
+            <text class="section-icon">🪄</text>
+          </view>
+          <view class="section-header-text">
+            <text class="section-title">基本信息</text>
+            <text class="section-caption">填写学科领域与论文题目</text>
+          </view>
+        </view>
+
+        <!-- 学科领域 -->
+        <view class="form-field">
+          <text class="field-label">学科领域 <text class="required">*</text></text>
+          <view class="field-control {{formData.field ? 'field-control--filled' : ''}}" bindtap="openFieldSelector">
+            <text class="field-control__text {{formData.field ? '' : 'placeholder'}}">{{formData.field || '请选择或输入学科领域'}}</text>
+            <text class="field-control__arrow">›</text>
+          </view>
+        </view>
+
+        <!-- 论文题目 -->
+        <view class="form-field">
+          <view class="field-label-row">
+            <text class="field-label">论文题目 <text class="required">*</text></text>
+            <view class="ai-name-btn {{isGeneratingTitle ? 'ai-name-btn--loading' : ''}}" bindtap="onGenerateTitle">
+              <text class="ai-name-btn__icon">{{isGeneratingTitle ? '⟳' : '✨'}}</text>
+              <text class="ai-name-btn__text">{{isGeneratingTitle ? '生成中…' : 'AI起名'}}</text>
+            </view>
+          </view>
+          <input
+            class="topic-input"
+            placeholder="请输入论文题目或研究主题"
+            placeholder-class="input-placeholder"
+            value="{{formData.topic}}"
+            bindinput="onTopicInput"
+            maxlength="100"
+          />
+          <text class="field-hint">题目越准确，生成内容越符合需求</text>
+        </view>
+      </view>
+
+      <!-- 写作灵感 -->
+      <view class="section-card">
+        <view class="section-header">
+          <view class="section-icon-wrap section-icon-wrap--amber">
+            <text class="section-icon">⚡</text>
+          </view>
+          <view class="section-header-text">
+            <text class="section-title">写作灵感</text>
+            <text class="section-caption">选择需要生成的文档类型（可多选）</text>
+          </view>
+        </view>
+        <view class="content-type-grid">
+          <block tt:for="{{contentTypes}}" tt:key="value">
+            <view
+              class="type-card {{item.selected ? 'type-card--selected' : ''}}"
+              data-value="{{item.value}}"
+              bindtap="toggleContentType"
+            >
+              <view class="type-card__top">
+                <text class="type-card__icon">{{item.icon}}</text>
+                <view class="type-card__check {{item.selected ? 'type-card__check--on' : ''}}">{{item.selected ? '✓' : ''}}</view>
+              </view>
+              <text class="type-card__label">{{item.label}}</text>
+              <text class="type-card__desc">{{item.description}}</text>
+              <view class="type-card__badge {{item.selected ? 'type-card__badge--on' : ''}}">{{item.credits}} 积分</view>
+            </view>
+          </block>
+        </view>
+      </view>
+
+      <!-- 详细要求（可折叠） -->
+      <view class="section-card">
+        <view class="section-header section-header--tap" bindtap="toggleDetailSettings">
+          <view class="section-icon-wrap section-icon-wrap--green">
+            <text class="section-icon">📝</text>
+          </view>
+          <view class="section-header-text">
+            <text class="section-title">详细要求</text>
+            <text class="section-caption">字数、格式及重点内容（可选）</text>
+          </view>
+          <text class="collapse-arrow {{detailSettingsOpen ? 'collapse-arrow--open' : ''}}">›</text>
+        </view>
+        <view class="collapse-body {{detailSettingsOpen ? 'collapse-body--open' : ''}}">
+          <textarea
+            class="detail-textarea"
+            placeholder="描述详细要求，例如：8000字、APA格式、重点分析XXX…"
+            placeholder-class="input-placeholder"
+            maxlength="500"
+            value="{{requirements}}"
+            bindinput="onRequirementsInput"
+          />
+          <text class="char-count">{{requirements.length}}/500</text>
+        </view>
+      </view>
+
+      <!-- 费用预览 -->
+      <view tt:if="{{selectedSummary !== '请选择生成类型'}}" class="cost-card {{isBalanceNotEnough ? 'cost-card--warn' : ''}}">
+        <view class="cost-row">
+          <view class="cost-block">
+            <text class="cost-label">预计消耗</text>
+            <view class="cost-value-row">
+              <text class="cost-number {{isBalanceNotEnough ? '' : 'cost-number--ok'}}">{{totalCost}}</text>
+              <text class="cost-unit">积分</text>
+            </view>
+            <text class="cost-note">{{selectedSummary}}</text>
+          </view>
+          <view class="cost-divider"></view>
+          <view class="cost-block">
+            <text class="cost-label">当前余额</text>
+            <view class="cost-value-row">
+              <text class="cost-number {{isBalanceNotEnough ? 'cost-number--low' : 'cost-number--ok'}}">{{credits}}</text>
+              <text class="cost-unit">积分</text>
+            </view>
+            <text class="cost-note">{{isBalanceNotEnough ? '余额不足' : '余额充足'}}</text>
+          </view>
+        </view>
+        <text class="cost-tip">ℹ️  生成后文档自动保存到文档库</text>
+
+        <view tt:if="{{isBalanceNotEnough}}" class="recharge-hint">
+          <view class="recharge-hint__header">
+            <text class="recharge-hint__icon">💡</text>
+            <view>
+              <text class="recharge-hint__title">积分不足，还差 {{rechargeShortage}} 积分</text>
+              <text class="recharge-hint__sub">充值后即可立即生成</text>
+            </view>
+          </view>
+          <view class="recharge-btns">
+            <view class="recharge-btn recharge-btn--gift" bindtap="onGoFirstRecharge">🎁 首充特惠，立省50元</view>
+            <view class="recharge-btn recharge-btn--primary" bindtap="onGoRecharge">⚡ 充1元得50积分</view>
+          </view>
+        </view>
+      </view>
+
+      <!-- 生成按钮 -->
+      <view class="generate-wrap">
+        <button
+          class="generate-btn {{generateBtnClass}}"
+          loading="{{isGenerating}}"
+          disabled="{{generateDisabled}}"
+          bindtap="onGenerate"
+        >
+          <text class="generate-btn__icon {{isGenerating ? 'spin' : ''}}">{{isGenerating ? '⟳' : (isBalanceNotEnough ? '💰' : '✨')}}</text>
+          <text class="generate-btn__text">{{generateButtonText}}</text>
+          <text tt:if="{{!isGenerating && !isBalanceNotEnough && !generateDisabled}}" class="generate-btn__arrow">→</text>
+        </button>
+      </view>
+
+      <!-- 生成结果 -->
+      <view tt:if="{{generatedContent}}" class="result-card">
+        <view class="result-card__header">
+          <text class="result-card__title">{{isGenerating ? '⏳ 生成中…' : '✅ 生成完成'}}</text>
+        </view>
+        <text class="result-card__body">{{generatedContent}}</text>
+        <view tt:if="{{!isGenerating}}" class="result-card__actions">
+          <view class="result-action-btn" bindtap="goToLibrary">
+            <text>📁 查看文档库</text>
+          </view>
+        </view>
+      </view>
+
+      <!-- 免责提示 -->
+      <view class="tips-panel">
+        <view class="tip-item" tt:for="{{[
+          '本内容由AI大模型辅助生成，仅供写作灵感参考。',
+          'AI生成内容可能存在事实错误，请务必人工核实与修改。',
+          '严禁将生成内容直接作为学术成果提交，请遵守学术规范。'
+        ]}}" tt:key="*this">
+          <text class="tip-dot">·</text>
+          <text class="tip-text">{{item}}</text>
+        </view>
+      </view>
+
+    </view>
+  </scroll-view>
+
+  <!-- 学科选择底部弹窗 -->
+  <view tt:if="{{showFieldSelector}}" class="overlay" bindtap="closeFieldSelector">
+    <view class="bottom-sheet" catchtap="noop">
+      <view class="bottom-sheet__handle"></view>
+      <view class="bottom-sheet__header">
+        <text class="bottom-sheet__title">选择学科领域</text>
+        <view class="bottom-sheet__close" bindtap="closeFieldSelector">
+          <text>✕</text>
+        </view>
+      </view>
+      <view class="bottom-sheet__search">
+        <view class="search-box">
+          <text class="search-icon">🔍</text>
+          <input
+            class="search-input"
+            placeholder="搜索学科 / 输入自定义内容"
+            placeholder-class="input-placeholder"
+            value="{{fieldSearchText}}"
+            bindinput="onFieldSearch"
+            confirm-type="done"
+            bindconfirm="useCustomField"
+            focus="{{shouldFocusSearch}}"
+          />
+        </view>
+        <view tt:if="{{hasSearchText}}" class="search-confirm" bindtap="useCustomField">
+          <text>确定</text>
+        </view>
+      </view>
+      <scroll-view scroll-y class="bottom-sheet__list" enhanced="true">
+        <view tt:if="{{showCustomOption}}" class="field-custom-row" bindtap="useCustomField">
+          <text class="field-custom-row__plus">＋</text>
+          <text class="field-custom-row__text">添加「{{fieldSearchText}}」</text>
+        </view>
+        <view
+          tt:for="{{filteredFields}}"
+          tt:key="*this"
+          class="field-row {{formData.field === item ? 'field-row--active' : ''}}"
+          data-field="{{item}}"
+          bindtap="selectField"
+        >
+          <text class="field-row__text">{{item}}</text>
+          <text tt:if="{{formData.field === item}}" class="field-row__check">✓</text>
+        </view>
+        <view tt:if="{{filteredFields.length === 0 && !hasSearchText}}" class="list-empty">暂无学科</view>
+      </scroll-view>
+    </view>
+  </view>
+
+  <phone-login-modal show="{{showPhoneLoginModal}}" bind:close="onPhoneLoginClose" bind:success="onPhoneLoginSuccess"></phone-login-modal>
+</view>

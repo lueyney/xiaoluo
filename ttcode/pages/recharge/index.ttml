@@ -1,0 +1,145 @@
+﻿<view class="recharge-page">
+  <!-- 右上角支付记录按钮 -->
+  <view class="top-right-btn" bindtap="goToPaymentRecords">
+    <text class="btn-icon">📝</text>
+    <text class="btn-text">支付记录</text>
+  </view>
+
+  <view class="hero-card">
+    <view class="hero-bg-circle"></view>
+    <view class="hero-content">
+      <text class="hero-title">积分充值</text>
+      <text class="hero-subtitle">1元 = 1积分</text>
+      <view class="current-balance">
+        <text class="balance-prefix">当前余额：</text>
+        <text class="balance-number">{{credits}}</text>
+        <text class="balance-suffix">积分</text>
+      </view>
+    </view>
+  </view>
+
+  <view tt:if="{{!hasFirstRecharge && firstTimePackage}}" class="recommend-banner" bindtap="selectRecommendPackage">
+    <view class="banner-content">
+      <text class="banner-icon">🎁</text>
+      <view class="banner-text">
+        <text class="banner-title">首次充值仅需 1 元</text>
+        <text class="banner-desc">即可获得 50 积分，体验完整功能</text>
+      </view>
+    </view>
+    <text class="banner-arrow">→</text>
+  </view>
+
+  <!-- iOS 屏蔽提示 -->
+  <view tt:if="{{!showPay}}" class="ios-blocked-tip">
+    <text class="tip-icon">⚠️</text>
+    <text class="tip-text">iOS 暂不支持充值功能，请使用 Android 设备或 PC 端进行充值</text>
+  </view>
+
+  <view class="packages-section" tt:if="{{showPay}}">
+    <text class="section-title">选择充值金额</text>
+    <text class="section-subtitle">支持微信支付、支付宝支付</text>
+    
+    <view class="packages-list">
+      <!-- 首充套餐 -->
+      <view 
+        tt:if="{{!hasFirstRecharge && firstTimePackage}}"
+        class="package-item package-first-time"
+        data-id="{{firstTimePackage.id}}"
+        data-firsttime="{{true}}"
+        bindtap="selectPackage">
+        
+        <view class="first-badge">首充特惠</view>
+        
+        <view class="package-left">
+          <view class="package-icon icon-orange">🎁</view>
+        </view>
+        
+        <view class="package-center">
+          <text class="package-amount amount-large">{{firstTimePackage.credits}}</text>
+          <text class="package-unit">积分</text>
+          <text class="package-desc">{{firstTimePackage.label}}</text>
+        </view>
+        
+        <view class="package-right">
+          <text class="package-price-label price-large">¥{{firstTimePackage.price}}</text>
+          <text class="package-rate">首充送{{firstTimePackage.bonus}}积分</text>
+          <text class="package-arrow">→</text>
+        </view>
+      </view>
+
+      <!-- 普通套餐 -->
+      <view 
+        tt:for="{{rechargePackages}}" 
+        tt:key="id"
+        class="package-item {{item.recommended ? 'package-recommended' : ''}}"
+        data-id="{{item.id}}"
+        data-firsttime="{{false}}"
+        bindtap="selectPackage">
+        
+        <view tt:if="{{item.recommended}}" class="hot-badge">热门推荐</view>
+        
+        <view class="package-left">
+          <view class="package-icon icon-purple">💎</view>
+        </view>
+        
+        <view class="package-center">
+          <text class="package-amount">{{item.credits}}</text>
+          <text class="package-unit">积分</text>
+          <text class="package-desc">{{item.label}}</text>
+        </view>
+        
+        <view class="package-right">
+          <text class="package-price-label">¥{{item.price}}</text>
+          <text class="package-rate">(1元=1积分)</text>
+          <text class="package-arrow">→</text>
+        </view>
+      </view>
+    </view>
+  </view>
+
+  <view class="why-section">
+    <view class="why-header">
+      <text class="why-icon">⚡</text>
+      <text class="why-title">为什么选择论文君？</text>
+    </view>
+    <view class="why-list">
+      <view class="why-item">
+        <text class="check-icon">✅</text>
+        <text class="why-text">AI智能写作，3分钟生成高质量论文</text>
+      </view>
+      <view class="why-item">
+        <text class="check-icon">✅</text>
+        <text class="why-text">支持7种文档类型，满足全流程需求</text>
+      </view>
+      <view class="why-item">
+        <text class="check-icon">✅</text>
+        <text class="why-text">专业降重服务，轻松通过查重检测</text>
+      </view>
+      <view class="why-item">
+        <text class="check-icon">✅</text>
+        <text class="why-text">积分永久有效，随时使用无压力</text>
+      </view>
+    </view>
+  </view>
+
+  <view class="notice-section">
+    <view class="notice-header">
+      <text class="notice-icon">💰</text>
+      <text class="notice-title">充值说明</text>
+    </view>
+    <view class="notice-list">
+      <text class="notice-item" tt:if="{{!hasFirstRecharge}}">• 首次充值1元，立享50积分（赠送49积分）</text>
+      <text class="notice-item">• 充值成功后积分立即到账</text>
+      <text class="notice-item">• 1元=1积分，公平透明无套路</text>
+      <text class="notice-item">• 支持微信支付</text>
+      <text class="notice-item">• 如有问题请联系在线客服</text>
+    </view>
+  </view>
+
+  <view class="secure-tips">
+    <text class="secure-item">✅ 安全支付</text>
+    <text class="secure-item">✅ 即时到账</text>
+    <text class="secure-item">✅ 7×24客服</text>
+  </view>
+</view>
+

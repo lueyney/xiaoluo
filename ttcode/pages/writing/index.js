@@ -1,0 +1,877 @@
+﻿// 简化模块加载逻辑，避免启动阻塞
+let auth = null;
+let points = null;
+let notifications = null;
+let docNotifications = null;
+let request = null;
+
+try {
+  auth = require("../../utils/auth.js");
+} catch (e) {
+  console.warn('auth 模块加载失败，使用默认实现');
+  auth = { 
+    requireLogin: () => true, 
+    isLoggedIn: () => false, 
+    getUserInfo: () => null 
+  };
+}
+
+try {
+  points = require("../../utils/points.js");
+} catch (e) {
+  console.warn('points 模块加载失败，使用默认实现');
+  points = {
+    getCredits: () => 0,
+    setCredits: () => {},
+    addCredits: () => {},
+    deductCredits: () => {},
+    hasEnoughCredits: () => false
+  };
+}
+
+try {
+  notifications = require("../../utils/notifications.js");
+} catch (e) {
+  console.warn('notifications 模块加载失败，使用默认实现');
+  notifications = {};
+}
+
+try {
+  docNotifications = require("../../utils/doc-notifications.js");
+} catch (e) {
+  console.warn('docNotifications 模块加载失败，使用默认实现');
+  docNotifications = {};
+}
+
+try {
+  request = require("../../utils/request.js").request;
+} catch (e) {
+  console.warn('request 模块加载失败，使用默认实现');
+  request = () => Promise.reject(new Error('request 模块未加载'));
+}
+
+const DEFAULT_FIELD_PLACEHOLDER = "请选择学科领域";
+const FIELD_OPTIONS = [
+  DEFAULT_FIELD_PLACEHOLDER,
+  "哲学",
+  "理论经济学",
+  "应用经济学",
+  "法学",
+  "政治学",
+  "社会学",
+  "民族学",
+  "马克思主义理论",
+  "教育学",
+  "心理学",
+  "体育学",
+  "文学",
+  "中国语言文学",
+  "外国语言文学",
+  "新闻传播学",
+  "化学",
+  "天文学",
+  "地理学",
+  "生态学",
+  "统计学",
+  "力学",
+  "机械工程",
+  "材料科学与工程",
+  "电气工程",
+  "电子科学与技术",
+  "信息与通信工程",
+  "控制科学与工程",
+  "计算机科学与技术",
+  "化学工程与技术",
+  "纺织科学与工程",
+  "轻工技术与工程",
+  "交通运输工程",
+  "兵器科学与技术",
+  "农业工程",
+  "林业工程",
+  "环境科学与工程",
+  "生物医学工程",
+  "食品科学与工程",
+  "城乡规划学",
+  "风景园林学",
+  "软件工程",
+  "农学",
+  "林学",
+  "医学",
+  "药学",
+  "护理学",
+  "工商管理",
+  "农林经济管理",
+  "公共管理",
+  "图书情报与档案管理",
+  "设计学",
+  "其他"
+];
+
+const SEARCH_DEBOUNCE_DELAY = 120;
+
+Page({
+  data: {
+    formData: {
+      field: "",
+      topic: "",
+      contentTypes: []
+    },
+    generatedTitles: [],
+    showFieldSelector: false,
+    fieldSearchText: "",
+    filteredFields: FIELD_OPTIONS.filter(field => field !== DEFAULT_FIELD_PLACEHOLDER),
+    shouldFocusSearch: false,
+    hasSearchText: false,
+    showCustomOption: false,
+    showPhoneLoginModal: false,
+    fields: FIELD_OPTIONS,
+    fieldIndex: 0,
+    contentTypes: [
+      { icon: "📝", label: "学术范文", value: "学术范文", description: "完整的学术研究论文", credits: 75, selected: false },
+      { icon: "📄", label: "开题报告", value: "开题报告", description: "研究计划和方法说明", credits: 25, selected: false },
+      { icon: "🛠️", label: "任务书", value: "任务书", description: "项目任务安排文档", credits: 20, selected: false },
+      { icon: "📚", label: "文献综述", value: "文献综述", description: "多篇文献综述整合", credits: 35, selected: false },
+      { icon: "🎤", label: "答辩稿", value: "答辩稿", description: "答辩演讲稿撰写", credits: 5, selected: false },
+      { icon: "📎", label: "中期检查表", value: "中期检查表", description: "研究进度检查记录", credits: 10, selected: false }
+    ],
+    requirements: "",
+    detailSettingsOpen: false,
+    selectedSummary: "请选择生成类型",
+    totalCost: 0,
+    isBalanceNotEnough: false,
+    generateState: "pending",
+    generateDisabled: true,
+    generateButtonText: "开始AI生成",
+    generateBtnClass: "generate-btn generate-btn-disabled",
+    credits: 0,
+    isGeneratingTitle: false,
+    rechargeShortage: 0
+  },
+  onLoad() {
+    try {
+      this.allFields = FIELD_OPTIONS.filter(field => field !== DEFAULT_FIELD_PLACEHOLDER);
+    } catch (error) {
+      console.error('onLoad 错误:', error);
+      this.allFields = [];
+    }
+  },
+  onUnload() {
+    if (typeof this.clearFieldFilterTimer === 'function') {
+      this.clearFieldFilterTimer();
+    }
+  },
+  onShow() {
+    // 立即设置导航栏，确保页面可见
+    try {
+      tt.setNavigationBarTitle({ title: "AI智能创作" });
+    } catch (error) {
+      console.warn('设置导航栏标题失败:', error);
+    }
+    
+    // 清除任何可能残留的loading遮罩
+    try {
+      tt.hideLoading();
+    } catch (error) {
+      // 忽略错误
+    }
+    
+    // 延迟执行非关键操作，避免阻塞页面渲染
+    setTimeout(() => {
+      try {
+        this.refreshCredits();
+        this.updateSummary();
+        this.checkLastGenerationStatus();
+      } catch (error) {
+        console.error('onShow 延迟操作错误:', error);
+      }
+    }, 100);
+    
+    // 恢复生成状态（从缓存）- 也延迟执行
+    setTimeout(() => {
+      try {
+        const generationState = tt.getStorageSync('currentGenerationState');
+        if (generationState && generationState.isGenerating) {
+          const now = Date.now();
+          // 如果生成任务在5分钟内，恢复状态
+          if (now - generationState.startTime < 5 * 60 * 1000) {
+            this.setData({
+              isGenerating: true,
+              lastGenerateTopic: generationState.topic,
+              lastGenerateCount: generationState.count,
+              generatedContent: `论文《${generationState.topic}》正在生成中...\n\n✨ AI正在创作中，您可以切换查看其他内容\n\n生成完成后将自动显示`
+            });
+            
+            // 继续轮询检查（不显示loading）
+            if (generationState.orderId) {
+              this.checkGenerationStatus(generationState.orderId, 0);
+            }
+          } else {
+            // 超时则清除状态
+            tt.removeStorageSync('currentGenerationState');
+          }
+        }
+      } catch (error) {
+        console.error('恢复生成状态错误:', error);
+      }
+    }, 200);
+  },
+  refreshCredits() {
+    try {
+      if (points && typeof points.getCredits === 'function') {
+        const balance = points.getCredits();
+        this.setData({ credits: balance });
+      } else {
+        // 如果模块未加载，使用默认值
+        this.setData({ credits: 0 });
+      }
+    } catch (error) {
+      console.error('refreshCredits 错误:', error);
+      this.setData({ credits: 0 });
+    }
+  },
+  goToLibrary() {
+    if (!auth.requireLogin(true)) {
+      return;
+    }
+    tt.switchTab({ url: "/pages/library/index" });
+  },
+  openFieldSelector() {
+    this.clearFieldFilterTimer();
+    const allFields = this.allFields || FIELD_OPTIONS.filter(field => field !== DEFAULT_FIELD_PLACEHOLDER);
+    this.allFields = allFields;
+    this.setData({ 
+      showFieldSelector: true,
+      filteredFields: allFields,
+      fieldSearchText: "",
+      shouldFocusSearch: false,
+      hasSearchText: false,
+      showCustomOption: false
+    });
+    // 使用 setTimeout 替代 nextTick（抖音小程序可能不支持 nextTick）
+    setTimeout(() => {
+      this.setData({ shouldFocusSearch: true });
+    }, 0);
+  },
+  
+  closeFieldSelector() {
+    this.clearFieldFilterTimer();
+    this.setData({ 
+      showFieldSelector: false,
+      fieldSearchText: "",
+      shouldFocusSearch: false,
+      hasSearchText: false,
+      showCustomOption: false
+    });
+  },
+  
+  onFieldSearch(e) {
+    const searchText = (e.detail.value || "").toString();
+    const trimmedText = searchText.trim();
+    const allFields = this.allFields || FIELD_OPTIONS.filter(field => field !== DEFAULT_FIELD_PLACEHOLDER);
+    this.allFields = allFields;
+
+    this.clearFieldFilterTimer();
+
+    if (!trimmedText) {
+      this.setData({ 
+        fieldSearchText: searchText,
+        filteredFields: allFields,
+        hasSearchText: false,
+        showCustomOption: false
+      });
+      return;
+    }
+
+    this.setData({
+      fieldSearchText: searchText,
+      hasSearchText: true
+    });
+
+    this.fieldFilterTimer = setTimeout(() => {
+      this.applyFieldFilter(trimmedText);
+    }, SEARCH_DEBOUNCE_DELAY);
+  },
+  applyFieldFilter(searchText) {
+    const lowerKeyword = searchText.toLowerCase();
+    const allFields = this.allFields || FIELD_OPTIONS.filter(field => field !== DEFAULT_FIELD_PLACEHOLDER);
+    this.allFields = allFields;
+    const filtered = allFields.filter(field => field.toLowerCase().includes(lowerKeyword));
+    const hasText = searchText.length > 0;
+    this.setData({
+      filteredFields: filtered,
+      hasSearchText: hasText,
+      showCustomOption: hasText && filtered.length === 0
+    });
+    this.fieldFilterTimer = null;
+  },
+  clearFieldFilterTimer() {
+    if (this.fieldFilterTimer) {
+      clearTimeout(this.fieldFilterTimer);
+      this.fieldFilterTimer = null;
+    }
+  },
+  
+  selectField(e) {
+    const field = e.currentTarget.dataset.field;
+    this.clearFieldFilterTimer();
+    this.setData({ 
+      "formData.field": field,
+      showFieldSelector: false,
+      fieldSearchText: "",
+      shouldFocusSearch: false,
+      hasSearchText: false,
+      showCustomOption: false,
+      generatedTitles: []
+    });
+    
+    this.updateSummary();
+    
+    tt.showToast({ 
+      title: "已选择：" + field, 
+      icon: "success",
+      duration: 1500
+    });
+  },
+  
+  useCustomField() {
+    const customField = this.data.fieldSearchText.trim();
+    if (!customField) {
+      tt.showToast({ title: "请输入学科名称", icon: "none", duration: 2000 });
+      return;
+    }
+    this.clearFieldFilterTimer();
+    this.setData({ 
+      "formData.field": customField,
+      showFieldSelector: false,
+      fieldSearchText: "",
+      shouldFocusSearch: false,
+      hasSearchText: false,
+      showCustomOption: false,
+      generatedTitles: []
+    });
+    
+    this.updateSummary();
+    
+    tt.showToast({ 
+      title: "已选择：" + customField, 
+      icon: "success",
+      duration: 1500
+    });
+  },
+  onTopicInput(e) {
+    this.setData({ "formData.topic": e.detail.value });
+    this.updateSummary();
+  },
+  onRequirementsInput(e) {
+    this.setData({ requirements: e.detail.value });
+  },
+  onGenerateTitle() {
+    if (!this.data.formData.field) {
+      tt.showToast({ title: "请先选择学科领域", icon: "none" });
+      return;
+    }
+    if (this.data.isGeneratingTitle) return;
+    
+    this.setData({ isGeneratingTitle: true });
+    
+    request({
+      url: "/api/title-generator/generate",
+      method: "POST",
+      data: { 
+        field: this.data.formData.field,
+        excludeTitles: this.data.generatedTitles
+      },
+      showLoading: true,
+      loadingText: "AI取名中..."
+    }).then((res) => {
+        if (res.statusCode === 200 && res.data && res.data.code === 'SUCCESS') {
+          const title = res.data.data.title;
+          
+          const newTitles = [...this.data.generatedTitles];
+          if (!newTitles.includes(title)) {
+            newTitles.push(title);
+            if (newTitles.length > 10) {
+              newTitles.shift();
+            }
+          }
+          
+          this.setData({ 
+            "formData.topic": title,
+          generatedTitles: newTitles
+          });
+          this.updateSummary();
+          tt.showToast({ title: "AI生成完成", icon: "success" });
+        } else {
+          tt.showToast({ title: "生成失败，请重试", icon: "none", duration: 2000 });
+        }
+    }).catch((err) => {
+      if (err && err.statusCode === 401) {
+        tt.showToast({ title: "需要登录后才能继续使用高级功能", icon: "none" });
+      } else {
+        tt.showToast({ title: "网络错误，请重试", icon: "none", duration: 2000 });
+      }
+    }).finally(() => {
+      this.setData({ isGeneratingTitle: false });
+    });
+  },
+  toggleContentType(e) {
+    if (!auth.requireLogin(true)) {
+      return;
+    }
+    const value = e.currentTarget.dataset.value;
+    const types = this.data.contentTypes.map(item => item.value === value ? Object.assign({}, item, { selected: !item.selected }) : item);
+    const selected = types.filter(item => item.selected).map(item => item.value);
+    this.setData({ contentTypes: types, "formData.contentTypes": selected });
+    this.updateSummary();
+  },
+  toggleDetailSettings() {
+    this.setData({ detailSettingsOpen: !this.data.detailSettingsOpen });
+  },
+  updateSummary() {
+    try {
+      const selected = this.data.contentTypes.filter(item => item.selected);
+      const totalCost = selected.reduce((sum, item) => sum + item.credits, 0);
+      const credits = (points && typeof points.getCredits === 'function') ? points.getCredits() : 0;
+      const isBalanceNotEnough = totalCost > credits;
+      const rechargeShortage = Math.max(totalCost - credits, 0);
+      const selectedSummary = selected.length ? "已选择：" + selected.map(item => item.label).join("、") : "请选择生成类型";
+      const ready = this.data.formData.field && this.data.formData.topic && selected.length && !isBalanceNotEnough;
+      const generateState = this.data.isGenerating ? "loading" : (ready ? "active" : "pending");
+      const generateDisabled = !ready;
+      const generateButtonText = this.data.isGenerating
+        ? "AI正在生成内容..."
+        : isBalanceNotEnough
+        ? "余额不足，需要 " + totalCost + " 积分"
+        : "开始AI生成";
+      this.setData({
+        selectedSummary,
+        totalCost,
+        isBalanceNotEnough,
+        generateState,
+        generateDisabled,
+        generateButtonText,
+        generateBtnClass: this.computeBtnClass(generateDisabled, isBalanceNotEnough),
+        credits,
+        rechargeShortage
+      });
+    } catch (error) {
+      console.error('updateSummary 错误:', error);
+      // 即使出错也要设置基本数据，避免页面无法显示
+      this.setData({
+        credits: 0,
+        totalCost: 0,
+        isBalanceNotEnough: false,
+        generateDisabled: true
+      });
+    }
+  },
+  onGoFirstRecharge() {
+    this.navigateToRecharge();
+  },
+  onGoRecharge() {
+    this.navigateToRecharge();
+  },
+  navigateToRecharge() {
+    if (!auth.requireLogin(true)) {
+      return;
+    }
+    tt.navigateTo({
+      url: "/pages/recharge/index",
+      fail: () => {
+        tt.switchTab({ url: "/pages/profile/index" });
+      }
+    });
+  },
+  computeBtnClass(disabled, notEnough) {
+    if (notEnough || disabled) {
+      return "generate-btn generate-btn-disabled";
+    }
+    return "generate-btn generate-btn-active";
+  },
+  onGenerate() {
+    if (!auth.requireLogin(true)) {
+      return;
+    }
+    if (this.data.isGenerating || this.data.generateDisabled) {
+      return;
+    }
+    const { field, topic, contentTypes } = this.data.formData;
+    if (!field) {
+      tt.showToast({ title: "请选择学科领域", icon: "none" });
+      return;
+    }
+    if (!topic.trim()) {
+      tt.showToast({ title: "请输入题目", icon: "none" });
+      return;
+    }
+    if (!contentTypes.length) {
+      tt.showToast({ title: "请选择生成类型", icon: "none" });
+      return;
+    }
+    if (this.data.isBalanceNotEnough) {
+      tt.showModal({
+        title: "积分不足",
+        content: `当前积分：${this.data.credits}\n所需积分：${this.data.totalCost}\n\n首充仅需1元即可获得50积分，是否前往充值？`,
+        showCancel: true,
+        cancelText: "取消",
+        confirmText: "去充值",
+        success: (res) => {
+          if (res.confirm) {
+            tt.navigateTo({ 
+              url: "/pages/recharge/index",
+              fail: () => {
+                tt.switchTab({ url: "/pages/profile/index" });
+              }
+            });
+          }
+        }
+      });
+      return;
+    }
+
+    // 显示确认弹窗，让用户确认是否生成
+    const selectedTypes = this.data.contentTypes.filter(item => item.selected);
+    const expectedCredits = selectedTypes.reduce((sum, item) => sum + item.credits, 0);
+    const typeNames = selectedTypes.map(item => item.label).join('、');
+    
+    tt.showModal({
+      title: "确认生成",
+      content: `确定要生成以下内容吗？\n\n📝 题目：${topic}\n📚 类型：${typeNames}\n💰 消耗积分：${this.data.totalCost}\n\n生成后将自动保存到文档库`,
+      showCancel: true,
+      cancelText: "取消",
+      confirmText: "确定生成",
+      success: (res) => {
+        if (res.confirm) {
+          // 用户确认后，开始生成
+          this.startGeneration();
+        }
+      }
+    });
+  },
+
+  // 开始生成（实际调用API）
+  startGeneration() {
+    const { field, topic, contentTypes } = this.data.formData;
+    
+    this.setData({ isGenerating: true });
+    this.updateSummary();
+    
+    // 不使用 tt.showLoading，避免遮罩问题
+    // 用户可以通过页面状态看到"正在生成中"
+    
+    const selectedTypes = this.data.contentTypes.filter(item => item.selected);
+    const expectedCredits = selectedTypes.reduce((sum, item) => sum + item.credits, 0);
+    
+    // 添加调试日志
+    console.log('🔍 生成请求参数:', {
+      topic: topic,
+      field: field || "教育学",
+      contentTypes: contentTypes,
+      expectedCredits: expectedCredits
+    });
+    
+    request({
+      url: "/api/coze/generate",
+      method: "POST",
+      data: {
+        topic: topic,
+        field: field || "教育学",
+        contentTypes: contentTypes,
+        expectedCredits: expectedCredits
+      }
+    }).then((res) => {
+        if (res.data && res.data.code === "PROCESSING") {
+          const docCount = contentTypes.length;
+          const estimatedMinutes = Math.ceil(docCount * 0.5);
+          const timeText = estimatedMinutes < 2 ? "1-2分钟" : `${estimatedMinutes}分钟左右`;
+          
+          // 不使用 tt.showLoading，避免遮罩问题
+          // 状态文本已经显示"正在生成中"
+          
+          // 保持isGenerating为true，直到生成完成
+          this.setData({
+            generatedContent: `论文《${topic}》正在生成中...\n\n✨ AI正在为您创作 ${docCount} 种文档\n⏱️ 预计 ${timeText}\n\n生成完成后，【文档库】将显示红点提示\n\n消耗积分：${this.data.totalCost}`,
+            lastGenerateTime: new Date().getTime(),
+            lastGenerateTopic: topic,
+            lastGenerateCount: docCount
+          });
+          
+          // 保存生成状态到缓存
+          tt.setStorageSync('currentGenerationState', {
+            isGenerating: true,
+            orderId: res.data.data.orderId,
+            topic: topic,
+            count: docCount,
+            startTime: Date.now()
+          });
+          
+          this.checkGenerationStatus(res.data.data.orderId, 0);
+        } else if (res.data && res.data.code === "INSUFFICIENT_CREDITS") {
+          // 积分不足
+          tt.showModal({
+            title: "积分不足",
+            content: `所需积分：${res.data.data.required}\n当前积分：${res.data.data.available}\n\n请先充值后再生成论文`,
+            showCancel: true,
+            cancelText: "取消",
+            confirmText: "去充值",
+            success: (modalRes) => {
+              if (modalRes.confirm) {
+                tt.navigateTo({ 
+                  url: "/pages/recharge/index",
+                  fail: () => {
+                    tt.switchTab({ url: "/pages/profile/index" });
+                  }
+                });
+              }
+            }
+          });
+          this.setData({ isGenerating: false });
+        } else {
+          tt.showModal({ 
+            title: "生成失败",
+            content: res.data.message || res.data.error || "提交失败，请重试",
+            showCancel: false
+          });
+          this.setData({ isGenerating: false });
+        }
+    }).catch((err) => {
+      if (err && err.statusCode === 401) {
+        tt.showToast({ title: "请重新登录后再生成内容", icon: "none" });
+      } else {
+        tt.showToast({ 
+          title: "网络异常，请稍后重试", 
+          icon: "none" 
+        });
+      }
+      this.setData({ isGenerating: false });
+      this.updateSummary();
+    });
+  },
+  
+  checkGenerationStatus(orderId, attempts) {
+    if (!auth.requireLogin(true)) {
+      return;
+    }
+    const MAX_ATTEMPTS = 30;
+    
+    let checkDelay;
+    if (attempts === 0) {
+      checkDelay = 35000;
+    } else if (attempts <= 8) {
+      checkDelay = 6000;
+    } else {
+      checkDelay = 20000;
+    }
+    
+    if (attempts >= MAX_ATTEMPTS) {
+      this.setData({ 
+        isGenerating: false,
+        generatedContent: `文档生成中...\n\n请稍后前往【文档库】或【订单】查看`
+      });
+      
+      // 清除生成状态缓存
+      tt.removeStorageSync('currentGenerationState');
+      
+      return;
+    }
+    
+    setTimeout(() => {
+      request({
+        url: `/api/orders/${orderId}`,
+        method: "GET",
+        timeout: 30000
+      }).then((res) => {
+          if (res.statusCode === 200 && res.data) {
+            let order = null;
+            if (res.data.data) {
+              order = res.data.data;
+            } else if (res.data.status) {
+              order = res.data;
+            } else {
+              this.checkGenerationStatus(orderId, attempts + 1);
+              return;
+            }
+            
+            if (order.status === 'completed') {
+              this.setData({ isGenerating: false });
+              
+              // 清除生成状态缓存
+              tt.removeStorageSync('currentGenerationState');
+              
+              points.syncCreditsFromServer();
+              
+              const docCount = this.data.lastGenerateCount || 1;
+              const docTypeText = docCount > 1 ? `${docCount}个文档` : '文档';
+              
+              this.setData({
+                generatedContent: `✅ ${docTypeText}已生成！\n\n《${this.data.lastGenerateTopic}》\n\n📁 已保存到文档库`,
+                generateState: 'completed'
+              });
+              
+              tt.setStorageSync('lastGenerationStatus', {
+                orderId: orderId,
+                status: 'completed',
+                topic: this.data.lastGenerateTopic,
+                count: docCount,
+                time: new Date().getTime()
+              });
+              
+              tt.setStorageSync('hasNewDocuments', true);
+              tt.setStorageSync('newDocumentsCount', docCount);
+              
+              // 设置TabBar红点
+              tt.setTabBarBadge({
+                index: 1,
+                text: docCount > 9 ? '9+' : String(docCount)
+              });
+              
+              // 仅弹窗提示一次：使用本地缓存记录已提示过的订单ID
+              try {
+                const notified = tt.getStorageSync('generationSuccessNotified') || {};
+                if (!notified[orderId]) {
+                  tt.showModal({
+                    title: '生成成功',
+                    content: `${docCount > 1 ? `${docCount}个文档` : '文档'}已生成完成\n\n已保存到【文档库】，可前往查看`,
+                    showCancel: false,
+                    confirmText: '知道了'
+                  });
+                  notified[orderId] = true;
+                  tt.setStorageSync('generationSuccessNotified', notified);
+                }
+              } catch (e) {
+                // 如果本地存储异常，至少保证不会影响正常流程
+                console.error('记录生成成功提示状态失败:', e);
+              }
+              
+              return;
+              
+            } else if (order.status === 'failed' || order.status === 'partial') {
+              this.setData({ isGenerating: false });
+              
+              // 清除生成状态缓存
+              tt.removeStorageSync('currentGenerationState');
+              
+              // 检查是否部分成功
+              const isPartial = order.status === 'partial';
+              const successCount = order.success_count || 0;
+              const failCount = order.fail_count || 0;
+              
+              if (isPartial && successCount > 0) {
+                tt.showModal({
+                  title: "部分生成成功",
+                  content: `成功：${successCount}个文档\n失败：${failCount}个文档\n\n失败部分的积分已退还\n\n请前往【文档库】查看已生成的文档`,
+                  showCancel: false,
+                  confirmText: "知道了"
+                });
+                
+                this.setData({
+                  generatedContent: `⚠️ 部分生成成功\n\n成功：${successCount}个\n失败：${failCount}个\n\n📁 请查看文档库`,
+                  generateState: 'partial'
+                });
+                
+                // 设置文档库红点
+                if (successCount > 0) {
+                  tt.setTabBarBadge({
+                    index: 1,
+                    text: String(successCount)
+                  });
+                  tt.setStorageSync('hasNewDocuments', true);
+                  tt.setStorageSync('newDocumentsCount', successCount);
+                }
+              } else {
+                tt.showModal({
+                  title: "生成失败",
+                  content: `${order.failure_reason || '文档生成失败'}\n\n积分已退还，请重试`,
+                  showCancel: false,
+                  confirmText: "知道了"
+                });
+                
+                this.setData({
+                  generatedContent: `❌ 生成失败\n\n${order.failure_reason || '未知错误'}\n\n请重试或联系客服`,
+                  generateState: 'failed'
+                });
+              }
+              
+              // 刷新积分
+              if (points && typeof points.syncCreditsFromServer === 'function') {
+                try {
+                  points.syncCreditsFromServer();
+                } catch (e) {
+                  console.warn('刷新积分失败:', e);
+                }
+              } else {
+                // 如果方法不存在，使用 getCredits 刷新
+                this.refreshCredits();
+              }
+              
+              return;
+              
+            } else {
+              this.checkGenerationStatus(orderId, attempts + 1);
+            }
+          } else {
+            this.checkGenerationStatus(orderId, attempts + 1);
+          }
+      }).catch((err) => {
+        if (err && err.statusCode === 401) {
+          this.setData({
+            isGenerating: false,
+            generatedContent: '登录已过期，请重新登录后在文档库查看最新进度',
+            generateState: 'failed'
+          });
+        } else if (attempts >= 3) {
+            this.setData({
+              isGenerating: false,
+              generatedContent: `✅ 文档正在后台生成\n\n《${this.data.lastGenerateTopic}》\n\n生成完成后请前往【文档库】查看`,
+              generateState: 'processing'
+            });
+          } else {
+            this.checkGenerationStatus(orderId, attempts + 1);
+        }
+      });
+    }, checkDelay);
+  },
+  
+  onHide() {
+    tt.hideLoading();
+  },
+  
+  checkLastGenerationStatus() {
+    try {
+      const lastStatus = tt.getStorageSync('lastGenerationStatus');
+      if (lastStatus && lastStatus.status === 'completed') {
+        const now = new Date().getTime();
+        if (now - lastStatus.time < 5 * 60 * 1000) {
+          this.setData({
+            generatedContent: `✅ 文档生成完成！\n\n《${lastStatus.topic}》已保存\n\n📁 前往【文档库】查看（红点提示）`,
+            generateState: 'completed',
+            lastGenerateTopic: lastStatus.topic
+          });
+        }
+      }
+    } catch (e) {
+      console.error('检查生成状态失败:', e);
+    }
+  },
+  
+  // 显示一键登录弹窗
+  showPhoneLoginModal() {
+    this.setData({ showPhoneLoginModal: true });
+  },
+  
+  // 关闭一键登录弹窗
+  onPhoneLoginClose() {
+    this.setData({ showPhoneLoginModal: false });
+  },
+  
+  // 一键登录成功
+  onPhoneLoginSuccess(e) {
+    console.log('[首页] 一键登录成功', e.detail);
+    this.refreshCredits();
+    this.updateSummary();
+  },
+  noop() {
+    // 空函数用于阻止事件冒泡
+  }
+  
+});
