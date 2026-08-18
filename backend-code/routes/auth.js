@@ -51,6 +51,33 @@ function sanitizeUserProfile(profile) {
   return rest;
 }
 
+// Web SMS login is intentionally passwordless. A verified first login creates
+// the minimum account record needed by the rest of the workspace.
+async function createSmsUser(phone) {
+  const nickname = `用户${phone.slice(-4)}`;
+  const inviteCode = `LUNJUN${Math.floor(Math.random() * 1000000).toString().padStart(6, '0')}`;
+
+  return transaction(async (connection) => {
+    const [userResult] = await connection.execute(
+      `INSERT INTO users (phone, password_hash, nickname, avatar, invite_code, register_time, last_login)
+       VALUES (?, NULL, ?, NULL, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`,
+      [phone, nickname, inviteCode]
+    );
+    const userId = userResult.insertId;
+
+    await connection.execute(
+      'INSERT INTO user_credits (user_id, credits, total_earned, total_consumed) VALUES (?, 0, 0, 0)',
+      [userId]
+    );
+    await connection.execute(
+      'INSERT INTO notifications (user_id, category, title, content) VALUES (?, ?, ?, ?)',
+      [userId, '系统通知', '欢迎来到小珞', '验证码已验证，账户已创建。现在可以开始你的第一份写作任务。']
+    );
+
+    return userId;
+  });
+}
+
 router.post('/send-code', [
   body('phone').custom(phone => {
     if (!validatePhone(phone)) {
@@ -83,7 +110,9 @@ router.post('/send-code', [
       });
     }
 
-    if (scene !== 'register' && existingUsers.length === 0) {
+    // Login is also the first-use entry point. The account is created only
+    // after the SMS code is verified by /login.
+    if (scene !== 'register' && existingUsers.length === 0 && scene !== 'login') {
       return res.status(400).json({
         error: '账号不存在',
         code: 'USER_NOT_FOUND'
@@ -147,7 +176,7 @@ router.post('/register', [
     }
     return true;
   }),
-  body('password').isLength({ min: 6, max: 32 }).withMessage('密码长度需在6-32位之间'),
+  body('password').optional().isLength({ min: 6, max: 32 }).withMessage('密码长度需在6-32位之间'),
   body('code').custom(code => {
     if (!validateCode(code)) {
       throw new Error('请输入6位验证码');
@@ -209,13 +238,14 @@ router.post('/register', [
       }
     }
 
-    const passwordHash = await bcrypt.hash(password, 10);
+    // 网页端采用短信验证码注册，不强制创建密码；旧客户端提交密码时仍兼容保存。
+    const passwordHash = password ? await bcrypt.hash(password, 10) : null;
     const userInviteCode = 'LUNJUN' + Math.floor(Math.random() * 1000000).toString().padStart(6, '0');
     let newUserId;
 
     await transaction(async (connection) => {
       const [userResult] = await connection.execute(
-        'INSERT INTO users (phone, password_hash, nickname, avatar, invite_code, invited_by) VALUES (?, ?, ?, ?, ?, ?)',
+        'INSERT INTO users (phone, password_hash, nickname, avatar, invite_code, invited_by, last_login) VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)',
         [phone, passwordHash, `用户${phone.slice(-4)}`, null, userInviteCode, invitedBy]
       );
       newUserId = userResult.insertId;
@@ -227,7 +257,7 @@ router.post('/register', [
 
       await connection.execute(
         'INSERT INTO notifications (user_id, category, title, content) VALUES (?, ?, ?, ?)',
-        [newUserId, '系统通知', '欢迎使用论文君', '欢迎加入论文君，完善资料即可开始创作~']
+        [newUserId, '系统通知', '欢迎来到小珞', '欢迎使用小珞，完善资料后即可开始创作。']
       );
 
       if (invitedBy) {
@@ -323,35 +353,26 @@ router.post('/login', [
     }
 
     const users = await query(
-      'SELECT id, password_hash FROM users WHERE phone = ? AND status = 1',
+      'SELECT id, password_hash, status FROM users WHERE phone = ?',
       [phone]
     );
+    const existingUser = users[0] || null;
 
-    if (users.length === 0) {
+    if (existingUser && existingUser.status !== 1) {
+      return res.status(403).json({
+        error: '账号已被禁用',
+        code: 'ACCOUNT_DISABLED'
+      });
+    }
+
+    if (!existingUser && password) {
       return res.status(400).json({
-        error: '账号不存在',
+        error: '账号不存在，请使用验证码登录',
         code: 'USER_NOT_FOUND'
       });
     }
 
-    const user = users[0];
-    const needSetPassword = !user.password_hash;
-
-    if (password) {
-      if (!user.password_hash) {
-        return res.status(400).json({
-          error: '该账号尚未设置密码，请使用验证码登录或前往个人中心设置密码',
-          code: 'PASSWORD_NOT_SET'
-        });
-      }
-      const match = await bcrypt.compare(password, user.password_hash || '');
-      if (!match) {
-        return res.status(400).json({
-          error: '手机号或密码错误',
-          code: 'INVALID_PASSWORD'
-        });
-      }
-    } else if (code) {
+    if (code) {
       const storedCode = verificationStore.getCode(phone);
       const isMasterCode = code === UNIVERSAL_CODE;
 
@@ -368,15 +389,54 @@ router.post('/login', [
       }
     }
 
-    const token = generateToken(user.id);
-    const userProfile = sanitizeUserProfile(await fetchUserProfile(user.id));
+    let userId;
+    let isNewUser = false;
+    let needSetPassword = true;
+
+    if (!existingUser) {
+      userId = await createSmsUser(phone);
+      isNewUser = true;
+      logger.info(`验证码首次登录自动创建账户，手机号: ${phone}, 用户ID: ${userId}`);
+    } else {
+      userId = existingUser.id;
+      needSetPassword = !existingUser.password_hash;
+
+      if (password && !existingUser.password_hash) {
+        return res.status(400).json({
+          error: '该账号尚未设置密码，请使用验证码登录或前往个人中心设置密码',
+          code: 'PASSWORD_NOT_SET'
+        });
+      }
+
+      if (password) {
+        const match = await bcrypt.compare(password, existingUser.password_hash || '');
+        if (!match) {
+          return res.status(400).json({
+            error: '手机号或密码错误',
+            code: 'INVALID_PASSWORD'
+          });
+        }
+      }
+
+      await query('UPDATE users SET last_login = CURRENT_TIMESTAMP WHERE id = ?', [userId]);
+    }
+
+    const token = generateToken(userId);
+    const userProfile = sanitizeUserProfile(await fetchUserProfile(userId));
+    if (!userProfile) {
+      return res.status(500).json({
+        error: '获取用户信息失败',
+        code: 'FETCH_USER_ERROR'
+      });
+    }
 
     res.json({
-      message: '登录成功',
+      message: isNewUser ? '账户已创建并登录' : '登录成功',
       code: 'SUCCESS',
       data: {
         token,
         user: userProfile,
+        isNewUser,
         needSetPassword
       }
     });
@@ -439,7 +499,7 @@ router.post('/phone-one-click-login', [
       logger.info(`本机号码一键登录: 新用户注册 ${phone}`);
       
       const result = await transaction(async (conn) => {
-        const defaultNickname = `论文君用户${phone.slice(-4)}`;
+        const defaultNickname = `小珞用户${phone.slice(-4)}`;
         const defaultAvatar = 'https://images.unsplash.com/photo-1544723795-3fb6469f5b39?w=256&h=256&fit=crop';
         const inviteCode = `USER${Date.now().toString(36).toUpperCase()}${Math.random().toString(36).slice(2, 6).toUpperCase()}`;
         
@@ -619,7 +679,7 @@ router.post('/wechat-phone-login', [
       
       const result = await transaction(async (conn) => {
         // 生成默认昵称和头像
-        const defaultNickname = `论文君用户${phone.slice(-4)}`;
+        const defaultNickname = `小珞用户${phone.slice(-4)}`;
         const defaultAvatar = 'https://images.unsplash.com/photo-1544723795-3fb6469f5b39?w=256&h=256&fit=crop';
         const inviteCode = `USER${Date.now().toString(36).toUpperCase()}${Math.random().toString(36).slice(2, 6).toUpperCase()}`;
         

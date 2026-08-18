@@ -30,7 +30,6 @@ class Auth {
 
     async login(phone, password) {
         try {
-            utils.showLoading();
             const response = await api.login(phone, password);
             
             // 适配后端响应格式: {message, code, data: {token, user}}
@@ -38,7 +37,7 @@ class Auth {
                 throw new Error('登录响应格式错误');
             }
             
-            const { token, user, profile } = response.data;
+            const { token, user, profile, isNewUser } = response.data;
             
             if (!token) {
                 throw new Error('未获取到token');
@@ -52,7 +51,7 @@ class Auth {
             
             this.updateUI();
             this.closeAuthModal();
-            utils.showToast('登录成功', 'success');
+            utils.showToast(isNewUser ? '账户已自动创建，欢迎来到小珞' : '登录成功', 'success');
             if (window.router) window.router.navigate('writing');
             
             setTimeout(() => this.refreshUserInfo(), 500);
@@ -62,20 +61,17 @@ class Auth {
             console.error('登录失败:', error);
             utils.showToast(error.message || '登录失败', 'error');
             return false;
-        } finally {
-            utils.hideLoading();
         }
     }
 
     async loginByCode(phone, code) {
         try {
-            utils.showLoading();
             const response = await api.post('/auth/login', { phone, code });
             if (!response || !response.data) {
                 throw new Error('登录响应格式错误');
             }
 
-            const { token, user, profile } = response.data;
+            const { token, user, profile, isNewUser } = response.data;
             if (!token) {
                 throw new Error('未获取到token');
             }
@@ -88,7 +84,7 @@ class Auth {
 
             this.updateUI();
             this.closeAuthModal();
-            utils.showToast('登录成功', 'success');
+            utils.showToast(isNewUser ? '账户已自动创建，欢迎来到小珞' : '登录成功', 'success');
             if (window.router) window.router.navigate('writing');
             setTimeout(() => this.refreshUserInfo(), 500);
             return true;
@@ -96,15 +92,12 @@ class Auth {
             console.error('验证码登录失败:', error);
             utils.showToast(error.message || '登录失败', 'error');
             return false;
-        } finally {
-            utils.hideLoading();
         }
     }
 
-    async register(phone, password, code) {
+    async register(phone, code) {
         try {
-            utils.showLoading();
-            const response = await api.register(phone, password, code);
+            const response = await api.register(phone, code);
             
             if (!response || !response.data) {
                 throw new Error('注册响应格式错误');
@@ -124,7 +117,7 @@ class Auth {
             
             this.updateUI();
             this.closeAuthModal();
-            utils.showToast('注册成功', 'success');
+            utils.showToast('验证成功，已登录', 'success');
             if (window.router) window.router.navigate('writing');
             setTimeout(() => this.refreshUserInfo(), 500);
             return true;
@@ -132,8 +125,6 @@ class Auth {
             console.error('注册失败:', error);
             utils.showToast(error.message || '注册失败', 'error');
             return false;
-        } finally {
-            utils.hideLoading();
         }
     }
 
@@ -314,108 +305,204 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     const authModal = document.getElementById('authModal');
+    let authReturnFocus = null;
     if (authModal) {
         authModal.addEventListener('click', (e) => {
             if (e.target.id === 'authModal') auth.closeAuthModal();
         });
         document.addEventListener('keydown', (e) => {
             if (e.key === 'Escape' && authModal.classList.contains('active')) auth.closeAuthModal();
+
+            if (e.key === 'Tab' && authModal.classList.contains('active')) {
+                const focusable = Array.from(authModal.querySelectorAll('button:not([disabled]), input:not([disabled]), a[href], [tabindex]:not([tabindex="-1"])'))
+                    .filter(element => element.offsetParent !== null);
+                if (!focusable.length) return;
+                const first = focusable[0];
+                const last = focusable[focusable.length - 1];
+                if (e.shiftKey && document.activeElement === first) {
+                    e.preventDefault();
+                    last.focus();
+                } else if (!e.shiftKey && document.activeElement === last) {
+                    e.preventDefault();
+                    first.focus();
+                }
+            }
         });
     }
+
+    const originalShowAuthModal = auth.showAuthModal.bind(auth);
+    auth.showAuthModal = function() {
+        authReturnFocus = document.activeElement;
+        originalShowAuthModal();
+    };
+
+    const originalCloseAuthModal = auth.closeAuthModal.bind(auth);
+    auth.closeAuthModal = function() {
+        const wasOpen = authModal && authModal.classList.contains('active');
+        originalCloseAuthModal();
+        if (wasOpen && authReturnFocus && typeof authReturnFocus.focus === 'function') {
+            window.setTimeout(() => authReturnFocus.focus(), 0);
+        }
+    };
 
     const modalContent = document.querySelector('#authModal .modal-content');
     if (modalContent) {
         modalContent.addEventListener('click', (e) => e.stopPropagation());
     }
 
-    document.querySelectorAll('.auth-tab').forEach(tab => {
+    const accountTabs = Array.from(document.querySelectorAll('.auth-tab'));
+
+    function activateAccountTab(tab, focusInput = true) {
+        if (!tab) return;
+        const tabName = tab.dataset.tab;
+        if (authModal) authModal.setAttribute('aria-label', tabName === 'register' ? '注册账户' : '登录账户');
+        accountTabs.forEach(t => {
+            const isActive = t === tab;
+            t.classList.toggle('active', isActive);
+            t.setAttribute('aria-selected', String(isActive));
+            t.tabIndex = isActive ? 0 : -1;
+        });
+        document.querySelectorAll('.auth-form').forEach(form => {
+            const isActive = form.id === tabName + 'Form';
+            form.classList.toggle('active', isActive);
+            form.setAttribute('aria-hidden', String(!isActive));
+        });
+        const targetForm = document.getElementById(tabName + 'Form');
+        setFormMessage(tabName + 'Form', '');
+        if (targetForm && focusInput) {
+            const firstInput = targetForm.querySelector('input:not([type="checkbox"])');
+            if (firstInput) window.setTimeout(() => firstInput.focus(), 80);
+        }
+    }
+
+    accountTabs.forEach(tab => {
         tab.addEventListener('click', () => {
-            const tabName = tab.dataset.tab;
-            document.querySelectorAll('.auth-tab').forEach(t => {
-                t.classList.remove('active');
-                t.setAttribute('aria-selected', 'false');
-            });
-            tab.classList.add('active');
-            tab.setAttribute('aria-selected', 'true');
-            document.querySelectorAll('.auth-form').forEach(form => form.classList.remove('active'));
-            const targetForm = document.getElementById(tabName + 'Form');
-            if (targetForm) {
-                targetForm.classList.add('active');
-                const firstInput = targetForm.querySelector('input:not([type="checkbox"])');
-                if (firstInput) window.setTimeout(() => firstInput.focus(), 80);
+            activateAccountTab(tab);
+        });
+        tab.addEventListener('keydown', (event) => {
+            if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
+            event.preventDefault();
+            const currentIndex = accountTabs.indexOf(tab);
+            let nextIndex = currentIndex;
+            if (event.key === 'ArrowRight') nextIndex = (currentIndex + 1) % accountTabs.length;
+            if (event.key === 'ArrowLeft') nextIndex = (currentIndex - 1 + accountTabs.length) % accountTabs.length;
+            if (event.key === 'Home') nextIndex = 0;
+            if (event.key === 'End') nextIndex = accountTabs.length - 1;
+            const nextTab = accountTabs[nextIndex];
+            activateAccountTab(nextTab, false);
+            nextTab.focus();
+        });
+    });
+
+    activateAccountTab(accountTabs.find(tab => tab.classList.contains('active')) || accountTabs[0], false);
+
+    function setFieldMessage(inputId, message, type = 'error') {
+        const input = document.getElementById(inputId);
+        const group = input && input.closest('.form-group');
+        const messageElement = document.getElementById(inputId + 'Error');
+        if (!group || !messageElement) return;
+        group.classList.toggle('has-error', Boolean(message) && type === 'error');
+        messageElement.classList.toggle('auth-field-hint', type === 'hint');
+        messageElement.textContent = message || '';
+        if (input) input.setAttribute('aria-invalid', message && type === 'error' ? 'true' : 'false');
+    }
+
+    function clearFieldMessage(inputId, hint = '') {
+        setFieldMessage(inputId, hint, hint ? 'hint' : 'error');
+    }
+
+    function setFormMessage(formId, message) {
+        const messageElement = document.getElementById(formId + 'Message');
+        if (messageElement) messageElement.textContent = message || '';
+    }
+
+    function setSubmitState(button, isBusy, idleLabel) {
+        if (!button) return;
+        button.disabled = isBusy;
+        button.classList.toggle('is-loading', isBusy);
+        button.setAttribute('aria-busy', String(isBusy));
+        button.textContent = isBusy ? '请稍候...' : idleLabel;
+    }
+
+    function setCodeButtonState(button, isBusy, label) {
+        if (!button) return;
+        button.disabled = isBusy;
+        button.classList.toggle('is-loading', isBusy);
+        button.setAttribute('aria-busy', String(isBusy));
+        button.textContent = label;
+    }
+
+    document.querySelectorAll('.auth-form input:not([type="checkbox"])').forEach(input => {
+        input.addEventListener('input', () => {
+            clearFieldMessage(input.id);
+            const form = input.closest('.auth-form');
+            if (form) setFormMessage(form.id, '');
+        });
+    });
+
+    document.querySelectorAll('.auth-password-toggle').forEach(toggle => {
+        toggle.addEventListener('click', () => {
+            const input = document.getElementById(toggle.dataset.target);
+            if (!input) return;
+            const shouldShow = input.type === 'password';
+            input.type = shouldShow ? 'text' : 'password';
+            toggle.setAttribute('aria-pressed', String(shouldShow));
+            toggle.setAttribute('aria-label', shouldShow ? '隐藏密码' : '显示密码');
+            const icon = toggle.querySelector('i');
+            if (icon) {
+                icon.classList.toggle('fa-eye', !shouldShow);
+                icon.classList.toggle('fa-eye-slash', shouldShow);
             }
+            input.focus({ preventScroll: true });
         });
     });
 
     const loginForm = document.getElementById('loginForm');
-    const smsLoginBtn = document.getElementById('smsLoginBtn');
-    const passwordLoginBtn = document.getElementById('passwordLoginBtn');
-    const loginPasswordGroup = document.getElementById('loginPasswordGroup');
-    const loginCodeGroup = document.getElementById('loginCodeGroup');
-    const loginPasswordInput = document.getElementById('loginPassword');
     const loginCodeInput = document.getElementById('loginCode');
     const loginSubmitBtn = document.getElementById('loginSubmitBtn');
     const sendLoginCodeBtn = document.getElementById('sendLoginCodeBtn');
 
-    function setLoginMode(mode) {
-        if (!loginForm) return;
-        loginForm.dataset.mode = mode;
-        const isSms = mode === 'sms';
-        if (loginPasswordGroup) loginPasswordGroup.style.display = isSms ? 'none' : 'block';
-        if (loginCodeGroup) loginCodeGroup.style.display = isSms ? 'block' : 'none';
-        if (loginPasswordInput) loginPasswordInput.required = !isSms;
-        if (loginCodeInput) loginCodeInput.required = isSms;
-        if (passwordLoginBtn) {
-            passwordLoginBtn.classList.toggle('is-active', !isSms);
-            passwordLoginBtn.setAttribute('aria-selected', String(!isSms));
+    ['loginPhone', 'registerPhone', 'loginCode', 'registerCode'].forEach(id => {
+        const input = document.getElementById(id);
+        if (input) {
+            input.addEventListener('input', () => {
+                input.value = input.value.replace(/\D/g, '');
+            });
         }
-        if (smsLoginBtn) {
-            smsLoginBtn.classList.toggle('is-active', isSms);
-            smsLoginBtn.setAttribute('aria-selected', String(isSms));
-        }
-        if (loginSubmitBtn) loginSubmitBtn.textContent = isSms ? '验证码登录' : '登录';
-    }
-
-    setLoginMode('password');
-
-    if (smsLoginBtn) {
-        smsLoginBtn.addEventListener('click', () => setLoginMode('sms'));
-    }
-    if (passwordLoginBtn) {
-        passwordLoginBtn.addEventListener('click', () => setLoginMode('password'));
-    }
+    });
 
     let loginCodeTimer = null;
     if (sendLoginCodeBtn) {
         sendLoginCodeBtn.addEventListener('click', async () => {
             const phone = document.getElementById('loginPhone').value.trim();
             if (!phone || phone.length !== 11) {
+                setFieldMessage('loginPhone', '请输入 11 位手机号');
+                document.getElementById('loginPhone').focus();
                 utils.showToast('请输入正确的手机号', 'error');
                 return;
             }
             if (sendLoginCodeBtn.disabled) return;
 
             try {
-                utils.showLoading();
+                setFormMessage('loginForm', '');
+                setCodeButtonState(sendLoginCodeBtn, true, '发送中...');
                 await api.sendSms(phone, 'login');
                 utils.showToast('验证码已发送', 'success');
                 let countdown = 60;
-                sendLoginCodeBtn.disabled = true;
-                sendLoginCodeBtn.textContent = countdown + '秒后重试';
+                setCodeButtonState(sendLoginCodeBtn, true, countdown + '秒后重试');
                 loginCodeTimer = setInterval(() => {
                     countdown--;
                     if (countdown <= 0) {
                         clearInterval(loginCodeTimer);
-                        sendLoginCodeBtn.disabled = false;
-                        sendLoginCodeBtn.textContent = '发送验证码';
+                        setCodeButtonState(sendLoginCodeBtn, false, '重新发送');
                     } else {
                         sendLoginCodeBtn.textContent = countdown + '秒后重试';
                     }
                 }, 1000);
             } catch (error) {
+                setCodeButtonState(sendLoginCodeBtn, false, '重新发送');
+                setFormMessage('loginForm', error.message || '验证码发送失败，请稍后重试');
                 utils.showToast(error.message || '发送失败', 'error');
-            } finally {
-                utils.hideLoading();
             }
         });
     }
@@ -424,69 +511,75 @@ document.addEventListener('DOMContentLoaded', () => {
         loginForm.addEventListener('submit', async (e) => {
             e.preventDefault();
             const phone = document.getElementById('loginPhone').value.trim();
-            const mode = loginForm.dataset.mode || 'password';
+            const idleLabel = '验证并进入工作台';
+            setFormMessage('loginForm', '');
             
             if (!phone || phone.length !== 11) {
+                setFieldMessage('loginPhone', '请输入 11 位手机号');
+                document.getElementById('loginPhone').focus();
                 utils.showToast('请输入正确的手机号', 'error');
                 return;
             }
 
-            if (mode === 'sms') {
-                const code = (document.getElementById('loginCode') || {}).value?.trim() || '';
-                if (!code || code.length !== 6) {
-                    utils.showToast('请输入6位验证码', 'error');
-                    return;
-                }
-                await auth.loginByCode(phone, code);
+            const code = loginCodeInput?.value.trim() || '';
+            if (!code || code.length !== 6) {
+                setFieldMessage('loginCode', '请输入 6 位验证码');
+                loginCodeInput?.focus();
+                utils.showToast('请输入6位验证码', 'error');
                 return;
             }
-
-            const password = document.getElementById('loginPassword').value;
-            if (!password || password.length < 6) {
-                utils.showToast('密码长度至少6位', 'error');
-                return;
-            }
-            
-            await auth.login(phone, password);
+            setSubmitState(loginSubmitBtn, true, idleLabel);
+            const success = await auth.loginByCode(phone, code);
+            setSubmitState(loginSubmitBtn, false, idleLabel);
+            if (!success) setFormMessage('loginForm', '登录未完成，请检查验证码后重试');
         });
     }
 
     const registerForm = document.getElementById('registerForm');
+    const registerSubmitBtn = document.getElementById('registerSubmitBtn');
     if (registerForm) {
         registerForm.addEventListener('submit', async (e) => {
             e.preventDefault();
+            setFormMessage('registerForm', '');
             const phone = document.getElementById('registerPhone').value.trim();
             const code = document.getElementById('registerCode').value.trim();
-            const password = document.getElementById('registerPassword').value;
-            const passwordConfirm = document.getElementById('registerPasswordConfirm').value;
             
             if (!phone || phone.length !== 11) {
+                setFieldMessage('registerPhone', '请输入 11 位手机号');
+                document.getElementById('registerPhone').focus();
                 utils.showToast('请输入正确的手机号', 'error');
                 return;
             }
             
             if (!code || code.length !== 6) {
+                setFieldMessage('registerCode', '请输入 6 位验证码');
+                document.getElementById('registerCode').focus();
                 utils.showToast('请输入6位验证码', 'error');
                 return;
             }
             
-            if (!password || password.length < 6) {
-                utils.showToast('密码长度至少6位', 'error');
-                return;
-            }
-            
-            if (password !== passwordConfirm) {
-                utils.showToast('两次密码输入不一致', 'error');
-                return;
-            }
-
             const agreeEl = document.getElementById('registerAgree');
             if (!agreeEl || !agreeEl.checked) {
+                setFieldMessage('registerAgree', '请先阅读并同意协议');
+                if (agreeEl) agreeEl.focus();
                 utils.showToast('请阅读并同意用户协议与隐私政策', 'error');
                 return;
             }
             
-            await auth.register(phone, password, code);
+            setSubmitState(registerSubmitBtn, true, '验证并登录');
+            const success = await auth.register(phone, code);
+            setSubmitState(registerSubmitBtn, false, '验证并登录');
+            if (!success) setFormMessage('registerForm', '注册未完成，请检查信息后重试');
+        });
+    }
+
+    const registerAgree = document.getElementById('registerAgree');
+    if (registerAgree) {
+        registerAgree.addEventListener('change', () => {
+            if (registerAgree.checked) {
+                clearFieldMessage('registerAgree');
+                setFormMessage('registerForm', '');
+            }
         });
     }
 
@@ -497,6 +590,8 @@ document.addEventListener('DOMContentLoaded', () => {
             const phone = document.getElementById('registerPhone').value.trim();
             
             if (!phone || phone.length !== 11) {
+                setFieldMessage('registerPhone', '请输入 11 位手机号');
+                document.getElementById('registerPhone').focus();
                 utils.showToast('请输入正确的手机号', 'error');
                 return;
             }
@@ -504,28 +599,27 @@ document.addEventListener('DOMContentLoaded', () => {
             if (sendCodeBtn.disabled) return;
             
             try {
-                utils.showLoading();
+                setFormMessage('registerForm', '');
+                setCodeButtonState(sendCodeBtn, true, '发送中...');
                 await api.sendSms(phone, 'register');
                 utils.showToast('验证码已发送', 'success');
                 
                 let countdown = 60;
-                sendCodeBtn.disabled = true;
-                sendCodeBtn.textContent = countdown + '秒后重试';
+                setCodeButtonState(sendCodeBtn, true, countdown + '秒后重试');
                 
                 codeTimer = setInterval(() => {
                     countdown--;
                     if (countdown <= 0) {
                         clearInterval(codeTimer);
-                        sendCodeBtn.disabled = false;
-                        sendCodeBtn.textContent = '发送验证码';
+                        setCodeButtonState(sendCodeBtn, false, '重新发送');
                     } else {
                         sendCodeBtn.textContent = countdown + '秒后重试';
                     }
                 }, 1000);
             } catch (error) {
+                setCodeButtonState(sendCodeBtn, false, '重新发送');
+                setFormMessage('registerForm', error.message || '验证码发送失败，请稍后重试');
                 utils.showToast(error.message, 'error');
-            } finally {
-                utils.hideLoading();
             }
         });
     }

@@ -20,6 +20,7 @@ class Router {
         // 监听导航链接点击
         document.querySelectorAll('.nav-link').forEach(link => {
             link.addEventListener('click', (e) => {
+                if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || e.button !== 0) return;
                 e.preventDefault();
                 const page = link.dataset.page;
                 console.log('Router: 点击导航 -', page);

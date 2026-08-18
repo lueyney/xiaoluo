@@ -421,25 +421,25 @@ router.register('rewrite', function() {
     const userCredits = auth.isLoggedIn() ? auth.getCredits() : 0;
 
     mainContent.innerHTML = `
-        <div class="wrt-page rewrite-page" style="min-height:100vh;">
+        <div class="wrt-page rewrite-page">
             <div class="wrt-bg"></div>
             <div class="wrt-orb wrt-orb1"></div>
             <div class="wrt-orb wrt-orb2"></div>
-            <div style="max-width:1300px;margin:0 auto;padding:52px 24px 80px;position:relative;z-index:1;">
-                <div style="display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:28px;">
+            <div class="rewrite-wrap" style="max-width:1300px;margin:0 auto;padding:28px 24px 36px;position:relative;z-index:1;">
+                <div class="rewrite-header" style="display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:18px;">
                     <div>
                         <h1 class="rewrite-page-title" style="font-size:34px;font-weight:800;margin:0 0 6px;letter-spacing:-.8px;">AI 降重</h1>
                         <p class="rewrite-page-subtitle" style="font-size:14px;margin:0;">粘贴原文，选择适合的改写模式后开始处理</p>
                     </div>
-                    <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;justify-content:flex-end;">
+                    <div class="rewrite-header-actions" style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;justify-content:flex-end;">
                         <button type="button" class="doc-rewrite-entry-btn" onclick="router.navigate('document-rewrite')"><i class="fas fa-file-word"></i><span>文档降重</span></button>
-                    <div style="display:flex;align-items:center;gap:7px;padding:9px 18px;border-radius:50px;background:rgba(251,191,36,.10);border:1px solid rgba(251,191,36,.2);font-size:16px;font-weight:800;color:#fbbf24;white-space:nowrap;">
+                    <button type="button" class="rewrite-recharge-link" onclick="goToRechargeTab()" aria-label="前往充值积分" style="display:flex;align-items:center;gap:7px;padding:9px 14px;border-radius:10px;background:rgba(251,191,36,.10);border:0;font-size:16px;font-weight:800;color:#fbbf24;white-space:nowrap;cursor:pointer;">
                         <i class="fas fa-coins"></i>
                         <span style="font-size:15px;font-weight:600;color:#fbbf24;">${userCredits}</span>
-                        <span class="rewrite-muted" style="font-size:11px;font-weight:400;">积分</span>
-                    </div></div>
+                        <span class="rewrite-muted" style="font-size:11px;font-weight:600;">积分 · 充值</span>
+                    </button></div>
                 </div>
-                <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:18px;">
+                <div class="rewrite-editor-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-bottom:14px;">
                     <div class="rewrite-editor-card" style="background:rgba(255,255,255,.03);border-radius:16px;padding:18px;border:1px solid rgba(255,255,255,.08);box-shadow:0 4px 24px rgba(0,0,0,.3);display:flex;flex-direction:column;">
                         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
                             <div style="display:flex;align-items:center;gap:7px;">
@@ -449,7 +449,7 @@ router.register('rewrite', function() {
                             <span class="rewrite-muted" style="font-size:12px;"><span id="textCount">0</span> 字</span>
                         </div>
                         <textarea id="originalText" placeholder="粘贴需要降重的文本..."
-                            style="flex:1;min-height:500px;max-height:640px;padding:12px;border:2px solid rgba(255,255,255,.1);border-radius:10px;background:rgba(255,255,255,.04);font-size:13px;color:#f0f4ff;outline:none;resize:none;font-family:inherit;line-height:1.8;transition:border-color 0.2s;box-sizing:border-box;overflow-y:auto;"
+                            style="flex:1;min-height:clamp(360px,48vh,470px);max-height:560px;padding:15px;border:0;border-radius:12px;background:rgba(255,255,255,.04);font-size:13px;color:#f0f4ff;outline:none;resize:none;font-family:inherit;line-height:1.8;transition:box-shadow 0.2s;box-sizing:border-box;overflow-y:auto;"
                             onfocus="this.style.borderColor='rgba(99,102,241,.7)'"
                             onblur="this.style.borderColor='rgba(255,255,255,.1)'"
                         >${rewriteState.originalText}</textarea>
@@ -469,11 +469,11 @@ router.register('rewrite', function() {
                                 style="padding:3px 10px;border-radius:7px;background:#faf5ff;border:1px solid #ddd6fe;color:#6d28d9;font-size:12px;cursor:pointer;">复制</button>
                         </div>
                         <div id="rewriteContent"
-                            style="flex:1;min-height:500px;max-height:640px;padding:12px;border-radius:10px;background:rgba(99,102,241,.07);white-space:pre-wrap;line-height:1.8;font-size:13px;color:#f0f4ff;overflow-y:auto;border:2px solid rgba(99,102,241,.2);"
+                            style="flex:1;min-height:clamp(360px,48vh,470px);max-height:560px;padding:15px;border-radius:12px;background:rgba(99,102,241,.07);white-space:pre-wrap;line-height:1.8;font-size:13px;color:#f0f4ff;overflow-y:auto;border:0;"
                         ><span class="rewrite-placeholder">处理结果将在这里显示</span></div>
                     </div>
                 </div>
-                <div style="display:flex;align-items:center;gap:12px;">
+                <div class="rewrite-toolbar" style="display:flex;align-items:center;gap:12px;">
                     <div id="rewriteVersionTabs" style="display:inline-flex;align-items:center;padding:4px;border-radius:12px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.1);gap:4px;">
                         <button type="button" data-rewrite-version="v1" style="padding:9px 18px;border-radius:8px;border:none;cursor:pointer;font-size:13px;font-weight:700;transition:background-color .12s,color .12s,box-shadow .12s;">V1 学术版</button>
                         <button type="button" data-rewrite-version="v2" style="padding:9px 18px;border-radius:8px;border:none;cursor:pointer;font-size:13px;font-weight:700;transition:background-color .12s,color .12s,box-shadow .12s;">V2 小说版</button>

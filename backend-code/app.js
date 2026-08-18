@@ -29,6 +29,7 @@ const douyinAuthRoutes = require('./routes/douyin-auth');
 const douyinPayRoutes = require('./routes/douyin-pay');
 const { startCleanupJob } = require('./utils/cleanup-orders');
 const { query, transaction } = require('./config/database');
+const { registerSeoPages } = require('./seo-pages');
 
 const app = express();
 const PORT = Number(process.env.PORT) || 3001;
@@ -83,6 +84,14 @@ app.locals.documentRewriteSave = async (job) => {
 };
 
 app.set('trust proxy', TRUST_PROXY);
+
+// 生产环境统一使用搜索引擎可识别的 HTTPS 规范地址，避免 http/https 被重复收录。
+app.use((req, res, next) => {
+  if (IS_PRODUCTION && req.method === 'GET' && !req.secure) {
+    return res.redirect(301, `https://${req.get('host')}${req.originalUrl}`);
+  }
+  return next();
+});
 
 app.use(helmet(IS_PRODUCTION
   ? {
@@ -253,6 +262,7 @@ app.use('/static', express.static(staticDir, {
 }));
 
 const webFrontendDir = path.join(__dirname, '../web-frontend');
+registerSeoPages(app);
 app.use(express.static(webFrontendDir, {
   maxAge: '0',
   etag: false,

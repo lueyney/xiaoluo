@@ -65,7 +65,7 @@ class API {
 
     // ==================== 认证 ====================
     async login(phone, password)           { return this.post('/auth/login', { phone, password }); }
-    async register(phone, password, code)  { return this.post('/auth/register', { phone, password, code }); }
+    async register(phone, code)            { return this.post('/auth/register', { phone, code }); }
     async sendSms(phone, scene = 'register') { return this.post('/auth/send-code', { phone, scene }); }
     async getUserInfo()                    { return this.get('/user/profile'); }
     async bindInviteCode(inviteCode)       { return this.post('/user/invite/bind', { inviteCode }); }

@@ -4,12 +4,62 @@
     <meta charset="UTF-8">
     <meta name="baidu-site-verification" content="codeva-YABfsPIcnw" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="description" content="小珞AI、小珞、AI小珞论文写作平台，提供AI论文写作、论文降重、开题报告、文献综述、任务书与答辩稿生成服务。">
+    <meta name="description" content="小珞AI是面向大学生的AI论文写作与降重助手，支持论文、开题报告、文献综述、任务书、答辩稿生成，以及文本和Word文档降重。">
     <meta name="keywords" content="小珞,AI小珞,小珞AI,论文写作,AI写作,论文降重,开题报告,文献综述,任务书,答辩稿">
-    <title>小珞AI - AI小珞论文写作与降重助手</title>
+    <meta name="robots" content="index,follow,max-image-preview:large,max-snippet:-1">
+    <meta name="theme-color" content="#42b9cf">
+    <link rel="canonical" href="https://yaoguangxiaoluo.cn/">
+    <link rel="alternate" hreflang="zh-CN" href="https://yaoguangxiaoluo.cn/">
+    <meta property="og:type" content="website">
+    <meta property="og:locale" content="zh_CN">
+    <meta property="og:site_name" content="小珞AI">
+    <meta property="og:title" content="小珞AI官网 - AI论文写作与降重助手">
+    <meta property="og:description" content="支持AI论文写作、开题报告、文献综述、任务书、答辩稿生成，以及文本和Word文档降重。">
+    <meta property="og:url" content="https://yaoguangxiaoluo.cn/">
+    <meta property="og:image" content="https://yaoguangxiaoluo.cn/assets/app-logo.png">
+    <title>小珞AI官网 - AI论文写作与降重助手</title>
     
     <!-- Favicon -->
-    <link rel="icon" type="image/png" href="assets/app-logo.png">
+    <link rel="icon" type="image/svg+xml" href="/assets/xiaoluo-mark.svg">
+    <link rel="icon" href="/favicon.ico" sizes="any">
+    <link rel="shortcut icon" href="/favicon.ico">
+    <link rel="icon" type="image/png" sizes="48x48" href="/favicon-48.png">
+    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
+    <link rel="manifest" href="/site.webmanifest">
+
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@graph": [
+        {
+          "@type": "Organization",
+          "@id": "https://yaoguangxiaoluo.cn/#organization",
+          "name": "小珞AI",
+          "alternateName": ["AI小珞", "小珞"],
+          "url": "https://yaoguangxiaoluo.cn/",
+          "logo": "https://yaoguangxiaoluo.cn/assets/xiaoluo-mark.svg"
+        },
+        {
+          "@type": "WebSite",
+          "@id": "https://yaoguangxiaoluo.cn/#website",
+          "url": "https://yaoguangxiaoluo.cn/",
+          "name": "小珞AI",
+          "alternateName": "AI小珞",
+          "inLanguage": "zh-CN",
+          "publisher": { "@id": "https://yaoguangxiaoluo.cn/#organization" }
+        },
+        {
+          "@type": "SoftwareApplication",
+          "name": "小珞AI论文写作与降重助手",
+          "applicationCategory": "EducationalApplication",
+          "operatingSystem": "Web",
+          "url": "https://yaoguangxiaoluo.cn/",
+          "description": "提供AI论文写作、开题报告、文献综述、任务书、答辩稿生成，以及文本和Word文档降重服务。",
+          "offers": { "@type": "Offer", "price": "0", "priceCurrency": "CNY", "description": "手机号验证后即可使用" }
+        }
+      ]
+    }
+    </script>
     
     <link rel="stylesheet" href="css/main.css">
     <link rel="stylesheet" href="css/theme.css">
@@ -22,16 +72,16 @@
     <nav class="navbar" id="navbar">
         <div class="container">
             <button class="nav-brand" id="brandButton" type="button" aria-label="返回起始页">
-                <img src="assets/app-logo.png" alt="AI小珞" style="width:32px;height:32px;border-radius:50%;margin-right:8px;">
+                <img src="assets/xiaoluo-mark.svg" alt="AI小珞" style="width:34px;height:34px;border-radius:10px;margin-right:9px;">
                 <span>AI小珞</span>
             </button>
             <div class="nav-menu" id="navMenu">
-                <a href="#home" class="nav-link active" data-page="home">首页</a>
-                <a href="#writing" class="nav-link" data-page="writing">创作</a>
+                <a href="/" class="nav-link active" data-page="home">首页</a>
+                <a href="/ai-writing/" class="nav-link" data-page="writing">AI写作</a>
                 <a href="#library" class="nav-link" data-page="library" data-auth-only>文档库</a>
-                <a href="#rewrite" class="nav-link" data-page="rewrite">AI降重</a>
-                <a href="#document-rewrite" class="nav-link" data-page="document-rewrite">文档降重</a>
-                <a href="#orders" class="nav-link" data-page="orders" data-auth-only>订单</a>
+                <a href="/paper-rewrite/" class="nav-link" data-page="rewrite">AI降重</a>
+                <a href="/document-rewrite/" class="nav-link" data-page="document-rewrite">文档降重</a>
+                <a href="/pricing/" class="nav-link" data-page="orders">积分/订单</a>
             </div>
             <div class="nav-actions">
                 <button class="theme-toggle" id="themeToggle" type="button" aria-label="切换主题" title="切换到亮色模式">
@@ -40,10 +90,11 @@
                     <span class="theme-toggle-label">换肤</span>
                 </button>
                 <div class="user-info" id="userInfo" style="display: none;">
-                    <span class="credits-badge">
+                    <button class="credits-badge" type="button" onclick="goToRechargeTab()" aria-label="充值积分" title="充值积分">
                         <i class="fas fa-coins"></i>
                         <span id="userCredits">0</span>
-                    </span>
+                        <span class="credits-badge-label">充值</span>
+                    </button>
                     <div class="account-menu-wrap">
                         <button class="account-avatar-btn" id="accountMenuButton" type="button" aria-label="打开账户菜单" aria-controls="accountMenu" aria-expanded="false">
                             <span class="account-avatar-letter" id="accountAvatarLetter">用</span>
@@ -56,6 +107,10 @@
                             <div class="account-menu-code">
                                 <code id="navInviteCode">--</code>
                                 <button type="button" id="copyNavInviteCode" aria-label="复制邀请码" title="复制邀请码"><i class="fas fa-copy"></i></button>
+                            </div>
+                            <div class="account-menu-shortcuts" aria-label="积分与订单">
+                                <button type="button" onclick="closeAccountMenu();goToRechargeTab()"><i class="fas fa-coins"></i><span>充值积分</span></button>
+                                <button type="button" onclick="closeAccountMenu();router.navigate('orders')"><i class="fas fa-receipt"></i><span>订单记录</span></button>
                             </div>
                             <button class="account-menu-logout" id="accountLogoutButton" type="button"><i class="fas fa-arrow-right-from-bracket"></i><span>退出登录</span></button>
                         </div>
@@ -74,119 +129,45 @@
         <!-- 页面内容将通过JavaScript动态加载 -->
     </main>
 
-    <!-- 登录/注册模态框 -->
-    <div class="modal auth-modal" id="authModal" role="dialog" aria-modal="true" aria-hidden="true" aria-labelledby="authDialogTitle">
+    <!-- 手机号验证登录模态框 -->
+    <div class="modal auth-modal" id="authModal" role="dialog" aria-modal="true" aria-hidden="true" aria-label="登录账户">
         <div class="modal-content auth-shell">
             <button class="modal-close" id="modalClose" type="button" aria-label="关闭登录窗口">
                 <i class="fas fa-times"></i>
             </button>
             <aside class="auth-brand-panel" aria-hidden="true">
-                <div class="auth-brand-lockup">
-                    <img src="assets/app-logo.png" alt="">
-                    <div><strong>AI小珞</strong><span>学术写作工作台</span></div>
-                </div>
-                <div class="auth-brand-copy">
-                    <span class="auth-brand-kicker">YOUR WRITING DESK</span>
-                    <h2>回到你的写作进度</h2>
-                    <p>材料、降重结果与历史文档，都在同一个工作台等你继续。</p>
-                </div>
-                <div class="auth-stage-visual">
-                    <span class="auth-stage-orbit"></span>
-                    <div class="auth-stage-card auth-stage-card-main">
-                        <i class="fas fa-file-lines"></i>
-                        <span><strong>论文写作</strong><small>内容结构已整理</small></span>
-                        <em>68%</em>
-                    </div>
-                    <div class="auth-stage-card auth-stage-card-rewrite">
-                        <i class="fas fa-wand-magic-sparkles"></i>
-                        <span><strong>智能降重</strong><small>表达优化中</small></span>
-                    </div>
-                    <div class="auth-stage-card auth-stage-card-library">
-                        <i class="fas fa-folder-open"></i>
-                        <span><strong>文档库</strong><small>统一保存结果</small></span>
-                    </div>
-                </div>
-                <div class="auth-brand-features">
-                    <span><i class="fas fa-check"></i> 写作</span>
-                    <span><i class="fas fa-check"></i> 降重</span>
-                    <span><i class="fas fa-check"></i> 文档管理</span>
+                <div class="auth-brand-signature">
+                    <img class="auth-brand-logo" src="assets/xiaoluo-mark.svg" alt="">
+                    <div class="auth-brand-name"><strong>AI小珞</strong><span>学术写作工作台</span></div>
                 </div>
             </aside>
 
             <div class="auth-container">
-                <div class="auth-tabs" role="tablist" aria-label="账户操作">
-                    <button class="auth-tab active" type="button" data-tab="login" role="tab" aria-selected="true"><span>01</span> 登录</button>
-                    <button class="auth-tab" type="button" data-tab="register" role="tab" aria-selected="false"><span>02</span> 注册账号</button>
-                </div>
-
                 <!-- 登录表单 -->
-                <form class="auth-form active" id="loginForm">
-                    <div class="auth-form-head">
-                        <span class="auth-form-kicker">WELCOME BACK</span>
-                        <h2 id="authDialogTitle">欢迎使用 AI小珞</h2>
-                        <p>登录后继续你的写作与文档任务</p>
-                    </div>
-                    <div class="auth-mode-tabs" role="tablist" aria-label="登录方式">
-                        <button type="button" class="auth-mode-tab is-active" id="passwordLoginBtn" data-mode="password">密码登录</button>
-                        <button type="button" class="auth-mode-tab" id="smsLoginBtn" data-mode="sms">验证码登录</button>
+                <form class="auth-form active" id="loginForm" aria-label="手机号验证码登录" novalidate>
+                    <div class="auth-form-intro">
+                        <h2>欢迎来到小珞</h2>
+                        <p>验证手机号即可进入工作台，首次使用会自动创建账户</p>
                     </div>
                     <div class="form-group">
                         <label for="loginPhone">手机号</label>
                         <div class="auth-input-wrap auth-phone-input">
                             <span>+86</span>
-                            <input type="tel" id="loginPhone" placeholder="请输入手机号" inputmode="numeric" autocomplete="username" maxlength="11" pattern="[0-9]{11}" required>
+                            <input type="tel" id="loginPhone" placeholder="请输入手机号" inputmode="numeric" autocomplete="username" maxlength="11" pattern="[0-9]{11}" aria-describedby="loginPhoneError" required>
                         </div>
+                        <p class="auth-field-message" id="loginPhoneError" aria-live="polite"></p>
                     </div>
-                    <div class="form-group" id="loginPasswordGroup">
-                        <label for="loginPassword">密码</label>
-                        <div class="auth-input-wrap"><i class="fas fa-lock"></i><input type="password" id="loginPassword" placeholder="请输入密码" required></div>
-                    </div>
-                    <div class="form-group" id="loginCodeGroup" style="display:none;">
+                    <div class="form-group" id="loginCodeGroup">
                         <label for="loginCode">验证码</label>
                         <div class="input-group auth-code-group">
-                            <div class="auth-input-wrap"><i class="fas fa-shield-halved"></i><input type="text" id="loginCode" placeholder="请输入 6 位验证码" inputmode="numeric" maxlength="6"></div>
-                            <button type="button" class="btn btn-secondary" id="sendLoginCodeBtn">发送验证码</button>
+                            <div class="auth-input-wrap"><i class="fas fa-shield-halved"></i><input type="text" id="loginCode" placeholder="请输入 6 位验证码" inputmode="numeric" autocomplete="one-time-code" maxlength="6" aria-describedby="loginCodeError" required></div>
+                            <button type="button" class="btn btn-secondary" id="sendLoginCodeBtn" aria-live="polite" aria-atomic="true">发送验证码</button>
                         </div>
+                        <p class="auth-field-message" id="loginCodeError" aria-live="polite"></p>
                     </div>
-                    <p class="auth-legal">登录即表示你同意 <a href="#" onclick="return false;">用户协议</a> 与 <a href="#" onclick="return false;">隐私政策</a></p>
-                    <button type="submit" class="btn btn-primary btn-block auth-submit" id="loginSubmitBtn">登录</button>
-                </form>
-
-                <!-- 注册表单 -->
-                <form class="auth-form" id="registerForm">
-                    <div class="auth-form-head">
-                        <span class="auth-form-kicker">CREATE ACCOUNT</span>
-                        <h2>创建你的写作空间</h2>
-                        <p>完成注册后即可开始创建第一份文档</p>
-                    </div>
-                    <div class="form-group">
-                        <label for="registerPhone">手机号</label>
-                        <div class="auth-input-wrap auth-phone-input"><span>+86</span><input type="tel" id="registerPhone" placeholder="请输入手机号" inputmode="numeric" autocomplete="tel" maxlength="11" pattern="[0-9]{11}" required></div>
-                    </div>
-                    <div class="form-group">
-                        <label for="registerCode">验证码</label>
-                        <div class="input-group auth-code-group">
-                            <div class="auth-input-wrap"><i class="fas fa-shield-halved"></i><input type="text" id="registerCode" placeholder="请输入 6 位验证码" inputmode="numeric" maxlength="6" required></div>
-                            <button type="button" class="btn btn-secondary" id="sendCodeBtn">发送验证码</button>
-                        </div>
-                    </div>
-                    <div class="auth-register-passwords">
-                        <div class="form-group">
-                            <label for="registerPassword">密码</label>
-                            <div class="auth-input-wrap"><i class="fas fa-lock"></i><input type="password" id="registerPassword" placeholder="6-20 位" minlength="6" maxlength="20" required></div>
-                        </div>
-                        <div class="form-group">
-                            <label for="registerPasswordConfirm">确认密码</label>
-                            <div class="auth-input-wrap"><i class="fas fa-lock"></i><input type="password" id="registerPasswordConfirm" placeholder="再次输入" maxlength="20" required></div>
-                        </div>
-                    </div>
-                    <div class="form-group auth-agree">
-                        <label class="auth-agree-label">
-                            <input type="checkbox" id="registerAgree">
-                            <span>我已阅读并同意 <a href="#" onclick="return false;">用户协议</a> 与 <a href="#" onclick="return false;">隐私政策</a></span>
-                        </label>
-                    </div>
-                    <button type="submit" class="btn btn-primary btn-block auth-submit">注册并开始</button>
+                    <p class="auth-form-message" id="loginFormMessage" aria-live="polite"></p>
+                    <button type="submit" class="btn btn-primary btn-block auth-submit" id="loginSubmitBtn">验证并进入工作台</button>
+                    <p class="auth-legal">继续即表示你同意 <a href="#" onclick="return false;">用户协议</a> 与 <a href="#" onclick="return false;">隐私政策</a></p>
                 </form>
             </div>
         </div>
