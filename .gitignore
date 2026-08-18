@@ -24,7 +24,7 @@ backend-code/pdf-*
 backend-code/report.pdf
 backend-code/stdout-*.json
 web-frontend/admin/workflows/assets/*
-!web-frontend/admin/workflows/assets/index-BVHLU9Rc.js
+!web-frontend/admin/workflows/assets/index-_B6rDuVn.js
 !web-frontend/admin/workflows/assets/index-CGSDsbie.css
 
 # Build/editor/system files

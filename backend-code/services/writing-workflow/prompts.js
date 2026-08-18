@@ -73,7 +73,7 @@ function buildSectionMessages(input) {
   ];
 }
 
-function buildTitleMessages({ field, excludeTitles }) {
+function buildLegacyTitleMessages({ field, excludeTitles = [] }) {
   return [
     {
       role: 'system',
@@ -83,6 +83,47 @@ function buildTitleMessages({ field, excludeTitles }) {
       role: 'user',
       content: `学科领域：${field}\n${excludeTitles.length ? `不要与这些题目重复或高度相似：${excludeTitles.join('；')}` : ''}`
     }
+  ];
+}
+
+function buildTitleMessages({ field, excludeTitles = [] }) {
+  return [
+    { role: 'system', content: '你是专业论文题目生成器，只输出一个论文题目，不加解释。' },
+    { role: 'user', content: `专业：${field}
+根据所在专业，生成论文题目。
+仅输出题目即可，示范：
+XXXX对策研究
+XXXXX现状分析
+XXXXX调查研究
+XXXXX设计
+XXXX背景下XXXX研究
+XXXX视域下XXXX研究
+基于XXXX的XXXX设计
+基于XXXX的XXXX分析
+基于XXXX的XXXX研究
+
+下面针对具体专业的题目范式：
+（1）经济管理类：
+基于杜邦分析法的XXX（公司）偿债/盈利/运营能力分析
+XXX（公司）盈利/运营/偿债能力分析
+中小企业/某某行业 盈利/运营/偿债能力分析-以XXX（公司名）为例
+
+（2）教育类
+中班/小班/大班幼儿XXX行为调查研究/分析
+XXX幼儿XXX行为及干预策略研究
+XXXX现状及策略研究
+XX（地区）小学/中学XXX研究
+XX（地区）小学/中学XXX调查研究
+XXX地区小/中学低/高年级XXX（现象，如课外阅读）的问题及对策研究-以那XX小学为例
+
+（3）电气
+基于matlab的XXX系统设计
+基于Matlab的XXXX（研究内容）XXX研究
+基于单片机的XXXX系统的设计与实现
+基于单片机的XXXXX系统设计
+基于PLC的XXXXX系统设计
+基于PLC的XXXXX的设计与实现
+${excludeTitles.length ? `不要重复这些题目：${excludeTitles.join('；')}` : ''}` }
   ];
 }
 

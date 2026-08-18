@@ -205,8 +205,10 @@ function validateWorkflowShape(workflow, { allowIncomplete = false } = {}) {
       if (!allowIncomplete && !['planDocument', 'draftSection', 'chat'].includes(String(node.data.action || ''))) errors.push(`DeepSeek 节点 ${node.id} 未选择有效动作`);
     }
     if (node.type === 'plugin') {
-      if (!allowIncomplete && String(node.data.plugin || 'academicSearch') !== 'academicSearch') errors.push(`插件节点 ${node.id} 仅支持学术检索插件`);
-      if (!allowIncomplete && !['openalex', 'semanticScholar', 'arxiv', 'crossref'].includes(String(node.data.provider || 'openalex'))) errors.push(`插件节点 ${node.id} 未选择有效的学术 API`);
+      const pluginName = String(node.data.plugin || 'academicSearch');
+      if (!allowIncomplete && !['academicSearch', 'companyFinancial'].includes(pluginName)) errors.push(`插件节点 ${node.id} 使用了不支持的插件`);
+      if (!allowIncomplete && pluginName === 'academicSearch' && !['openalex', 'semanticScholar', 'arxiv', 'crossref'].includes(String(node.data.provider || 'openalex'))) errors.push(`插件节点 ${node.id} 未选择有效的学术 API`);
+      if (!allowIncomplete && pluginName === 'companyFinancial' && String(node.data.provider || 'companyFinancial') !== 'companyFinancial') errors.push(`插件节点 ${node.id} 未选择有效的企业资料 API`);
       if (node.data.key !== undefined && typeof node.data.key !== 'string') errors.push(`插件节点 ${node.id} 的 Key 必须是文本`);
       if (typeof node.data.key === 'string' && node.data.key.length > 512) errors.push(`插件节点 ${node.id} 的 Key 不能超过 512 个字符`);
       if (node.data.input !== undefined && !['string', 'object'].includes(typeof node.data.input)) errors.push(`插件节点 ${node.id} 的输入必须是关键词或 JSON 对象`);

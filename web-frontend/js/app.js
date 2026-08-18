@@ -2,6 +2,8 @@
 (function initThemePreference() {
     try {
         if (localStorage.getItem('ai-theme') === 'light') document.body.classList.add('light-theme');
+        const initialPage = window.location.hash.slice(1) || 'home';
+        if (initialPage === 'home' && !localStorage.getItem('auth_token')) document.body.classList.add('public-home-view');
     } catch (e) {
         console.warn('主题偏好读取失败:', e);
     }

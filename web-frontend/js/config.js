@@ -6,7 +6,9 @@ const CONFIG = {
         const isLocal = host === 'localhost' || host === '127.0.0.1';
         const forcedProdApi = window.__API_BASE_URL__ || localStorage.getItem('apiBaseUrl');
 
-        if (isLocal) return 'http://localhost:3001/api';
+        // Keep the product page and workflow runtime on the same local
+        // process. This also lets 3001 and 3002 be tested independently.
+        if (isLocal) return `${window.location.origin}/api`;
 
         // 生产环境只接受主域名API，避免被本地存储中的错误子域名污染
         if (forcedProdApi) {

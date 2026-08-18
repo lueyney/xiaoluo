@@ -157,16 +157,18 @@ function validateInternalGraph(workflow) {
       const declaredRoutes = Array.isArray(node.data.routes) && node.data.routes.length
         ? node.data.routes.map((route) => String(route.key || '').trim())
         : [String(node.data.truthyRoute || 'true'), String(node.data.falsyRoute || 'false')];
-      if (routes.length !== 2) errors.push(`条件节点 ${node.data.label || node.id} 必须恰好连接两个分支`);
+      // A condition has two logical routes, but either route may fan out to
+      // several downstream nodes.  This is how a selector can start a
+      // parallel literature lookup and a drafting branch at the same time.
+      if (routes.length < 2) errors.push(`条件节点 ${node.data.label || node.id} 至少需要连接两个分支`);
       if (routeEdges.some((edge) => !String(edge.sourceHandle || edge.label || '').trim())) errors.push(`条件节点 ${node.data.label || node.id} 的每条分支连线都需要分支键`);
       const routeKeys = routeEdges.map((edge) => String(edge.sourceHandle || edge.label || '').trim()).filter(Boolean);
-      if (new Set(routeKeys).size !== routeKeys.length) errors.push(`条件节点 ${node.data.label || node.id} 的分支键不能重复`);
       if (routeKeys.some((key) => !declaredRoutes.includes(key))) errors.push(`条件节点 ${node.data.label || node.id} 使用了未声明的分支键`);
-      if (declaredRoutes.length !== 2 || declaredRoutes.some((key) => !key) || new Set(declaredRoutes).size !== declaredRoutes.length) {
+      if (declaredRoutes.length < 2 || declaredRoutes.some((key) => !key) || new Set(declaredRoutes).size !== declaredRoutes.length) {
         errors.push(`条件节点 ${node.data.label || node.id} 必须声明两个不重复的分支键`);
       }
       for (const key of declaredRoutes) {
-        if (routeKeys.filter((routeKey) => routeKey === key).length !== 1) errors.push(`条件节点 ${node.data.label || node.id} 的分支 ${key} 必须且只能连接一次`);
+        if (routeKeys.filter((routeKey) => routeKey === key).length < 1) errors.push(`条件节点 ${node.data.label || node.id} 的分支 ${key} 至少需要连接一次`);
       }
     }
   }

@@ -443,14 +443,24 @@ function compileWorkflow(workflowId, workflows, handlers = {}, options = {}) {
 
       for (const conditionId of conditionIds) {
         const outgoing = workflow.edges.filter((edge) => edge.source === conditionId);
-        const pathMap = Object.fromEntries(outgoing.map((edge) => [
-          String(edge.sourceHandle || edge.label || edge.target),
-          edge.target
-        ]));
+        // LangGraph conditional paths may return an array of destinations.
+        // Keep every edge for a route instead of collapsing duplicate route
+        // keys in Object.fromEntries; this enables a true one-to-many branch
+        // while retaining the normal mutually-exclusive route semantics.
+        const routeTargets = new Map();
+        for (const edge of outgoing) {
+          const key = String(edge.sourceHandle || edge.label || edge.target);
+          const targets = routeTargets.get(key) || [];
+          if (!targets.includes(edge.target)) targets.push(edge.target);
+          routeTargets.set(key, targets);
+        }
         graph.addConditionalEdges(conditionId, (state) => {
           const value = state.values[conditionId];
-          return String(value && value.route !== undefined ? value.route : value);
-        }, pathMap);
+          const route = String(value && value.route !== undefined ? value.route : value);
+          const targets = routeTargets.get(route) || [];
+          if (targets.length <= 1) return targets[0];
+          return targets;
+        });
       }
 
       const hasStartEdge = workflow.edges.some((edge) => startIds.has(edge.source) && executableIds.has(edge.target));

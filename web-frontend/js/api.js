@@ -97,7 +97,7 @@ class API {
      * 生成AI题目建议（对标小程序 /api/title-generator/generate）
      */
     async generateTitle(field, excludeTitles = []) {
-        return this.post('/title-generator/generate', { field, excludeTitles });
+        return this.post('/title-generator/generate', { field, excludeTitles }, { _timeout: 45000 });
     }
 
     // ==================== 订单状态轮询（对标小程序 GET /api/orders/:id）====================

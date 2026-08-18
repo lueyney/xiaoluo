@@ -166,6 +166,17 @@ function createWorkflowHandlers({ provider, config }) {
   return {
     plugin: async ({ node, state, workflow }) => {
       const pluginName = String(node.data.plugin || 'academicSearch');
+      if (pluginName === 'companyFinancial') {
+        const mapped = state.nodeInput && typeof state.nodeInput === 'object' && !Array.isArray(state.nodeInput)
+          ? state.nodeInput : {};
+        const keyword = String(mapped.keyword || node.data.input || '').trim();
+        if (!keyword) throw new Error(`[${workflow.name}] 企业资料检索需要公司名称或股票代码`);
+        // Keep this connector provider-neutral. Deployments can attach a
+        // companyFinancial handler/provider later without changing the graph
+        // contract; the trace still shows the exact requested keyword.
+        state.traceMeta = { plugin: 'companyFinancial', provider: 'companyFinancial', query: keyword, count: 0 };
+        return { provider: 'companyFinancial', query: keyword, total: 0, items: [], message: '企业财务资料插件尚未配置数据源' };
+      }
       if (pluginName !== 'academicSearch') throw new Error(`[${workflow.name}] 不支持的插件：${pluginName}`);
       const context = { ...state.context, nodeInput: state.nodeInput };
       const mapped = state.nodeInput && typeof state.nodeInput === 'object' && !Array.isArray(state.nodeInput)
@@ -350,7 +361,16 @@ function createWorkflowHandlers({ provider, config }) {
           step: node.id,
           ...settings
         });
-        return json ? response.data : response.content.trim();
+        if (json) return response.data;
+        const content = response.content.trim();
+        const outputFields = Array.isArray(node.data.cozeOutputFields) ? node.data.cozeOutputFields.filter(Boolean) : [];
+        if (!outputFields.length) return content;
+        if (outputFields.length === 1) return { [outputFields[0]]: content };
+        try {
+          const parsed = JSON.parse(content);
+          if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) return parsed;
+        } catch (_) { /* preserve the original Coze field contract below */ }
+        return Object.fromEntries(outputFields.map((field, index) => [field, index === 0 ? content : '']));
       }
       throw new Error(`[${workflow.name}] 未实现的 DeepSeek 动作：${node.data.action || node.id}`);
     },
@@ -358,10 +378,21 @@ function createWorkflowHandlers({ provider, config }) {
     condition: async ({ node, state }) => {
       const sourcePath = node.data.conditionSource || (node.data.valueFrom ? `values.${node.data.valueFrom}` : 'output');
       const value = getByPath(state.context, sourcePath);
-      const matched = compareCondition(value, node.data.operator || 'truthy', node.data.compareValue);
       const routes = Array.isArray(node.data.routes) && node.data.routes.length
         ? node.data.routes
         : [{ key: node.data.truthyRoute || 'true' }, { key: node.data.falsyRoute || 'false' }];
+      if (node.data.mode === 'routeValue') {
+        const raw = String(value == null ? '' : value).trim();
+        const normalized = raw.match(/[1-9][0-9]?/)?.[0] || raw;
+        const matchedRoute = routes.find((item) => (item.matchValues || []).some((candidate) => {
+          const expected = String(candidate == null ? '' : candidate).trim();
+          return expected && (normalized === expected || raw === expected || raw.includes(expected));
+        }));
+        const fallback = routes[routes.length - 1];
+        const route = (matchedRoute || fallback).key;
+        return { route, value, matched: Boolean(matchedRoute) };
+      }
+      const matched = compareCondition(value, node.data.operator || 'truthy', node.data.compareValue);
       const route = matched ? routes[0].key : routes[1].key;
       return { route, value, matched };
     }

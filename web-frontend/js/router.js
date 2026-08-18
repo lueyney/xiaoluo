@@ -82,6 +82,9 @@ class Router {
             window.history.replaceState({ page }, '', '#' + page);
         }
 
+        // 公共落地页采用独立的明亮品牌外观，离开首页后立即恢复工作台主题。
+        document.body.classList.toggle('public-home-view', page === 'home');
+
         // 检查路由处理器是否是函数
         if (typeof this.routes[page] !== 'function') {
             console.error('Router: 路由处理器不是函数 -', page);

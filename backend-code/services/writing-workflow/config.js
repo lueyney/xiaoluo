@@ -20,7 +20,10 @@ function getWritingConfig() {
       apiKey: process.env.DEEPSEEK_API_KEY || '',
       planningModel: process.env.DEEPSEEK_PLANNING_MODEL || process.env.DEEPSEEK_MODEL || 'deepseek-chat',
       draftingModel: process.env.DEEPSEEK_DRAFTING_MODEL || process.env.DEEPSEEK_MODEL || 'deepseek-chat',
-      titleModel: process.env.DEEPSEEK_TITLE_MODEL || process.env.DEEPSEEK_MODEL || 'deepseek-chat',
+      // Title generation is a short, direct answer. Do not inherit a global
+      // reasoning model here: it can spend the small output budget on hidden
+      // reasoning and return an empty visible answer.
+      titleModel: process.env.DEEPSEEK_TITLE_MODEL || 'deepseek-chat',
       timeoutMs: readInteger('DEEPSEEK_TIMEOUT_MS', 120000, { min: 10000, max: 600000 }),
       maxOutputTokens: readInteger(
         'DEEPSEEK_MAX_OUTPUT_TOKENS',

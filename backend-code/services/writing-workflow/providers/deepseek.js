@@ -150,7 +150,7 @@ class DeepSeekProvider {
       messages,
       model: this.config.titleModel,
       temperature: 0.8,
-      maxTokens: 256,
+      maxTokens: 512,
       traceId,
       step: 'title'
     });

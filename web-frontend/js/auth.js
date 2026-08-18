@@ -228,6 +228,13 @@ class Auth {
         const modal = document.getElementById('authModal');
         if (modal) {
             modal.classList.add('active');
+            modal.setAttribute('aria-hidden', 'false');
+            document.body.classList.add('auth-modal-open');
+            window.setTimeout(() => {
+                const activeForm = modal.querySelector('.auth-form.active');
+                const firstInput = activeForm && activeForm.querySelector('input:not([type="checkbox"])');
+                if (firstInput) firstInput.focus();
+            }, 120);
         }
     }
 
@@ -235,6 +242,8 @@ class Auth {
         const modal = document.getElementById('authModal');
         if (modal) {
             modal.classList.remove('active');
+            modal.setAttribute('aria-hidden', 'true');
+            document.body.classList.remove('auth-modal-open');
         }
     }
 }
@@ -309,6 +318,9 @@ document.addEventListener('DOMContentLoaded', () => {
         authModal.addEventListener('click', (e) => {
             if (e.target.id === 'authModal') auth.closeAuthModal();
         });
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape' && authModal.classList.contains('active')) auth.closeAuthModal();
+        });
     }
 
     const modalContent = document.querySelector('#authModal .modal-content');
@@ -319,16 +331,25 @@ document.addEventListener('DOMContentLoaded', () => {
     document.querySelectorAll('.auth-tab').forEach(tab => {
         tab.addEventListener('click', () => {
             const tabName = tab.dataset.tab;
-            document.querySelectorAll('.auth-tab').forEach(t => t.classList.remove('active'));
+            document.querySelectorAll('.auth-tab').forEach(t => {
+                t.classList.remove('active');
+                t.setAttribute('aria-selected', 'false');
+            });
             tab.classList.add('active');
+            tab.setAttribute('aria-selected', 'true');
             document.querySelectorAll('.auth-form').forEach(form => form.classList.remove('active'));
             const targetForm = document.getElementById(tabName + 'Form');
-            if (targetForm) targetForm.classList.add('active');
+            if (targetForm) {
+                targetForm.classList.add('active');
+                const firstInput = targetForm.querySelector('input:not([type="checkbox"])');
+                if (firstInput) window.setTimeout(() => firstInput.focus(), 80);
+            }
         });
     });
 
     const loginForm = document.getElementById('loginForm');
     const smsLoginBtn = document.getElementById('smsLoginBtn');
+    const passwordLoginBtn = document.getElementById('passwordLoginBtn');
     const loginPasswordGroup = document.getElementById('loginPasswordGroup');
     const loginCodeGroup = document.getElementById('loginCodeGroup');
     const loginPasswordInput = document.getElementById('loginPassword');
@@ -344,17 +365,24 @@ document.addEventListener('DOMContentLoaded', () => {
         if (loginCodeGroup) loginCodeGroup.style.display = isSms ? 'block' : 'none';
         if (loginPasswordInput) loginPasswordInput.required = !isSms;
         if (loginCodeInput) loginCodeInput.required = isSms;
-        if (smsLoginBtn) smsLoginBtn.textContent = isSms ? '密码登录' : '验证码登录';
+        if (passwordLoginBtn) {
+            passwordLoginBtn.classList.toggle('is-active', !isSms);
+            passwordLoginBtn.setAttribute('aria-selected', String(!isSms));
+        }
+        if (smsLoginBtn) {
+            smsLoginBtn.classList.toggle('is-active', isSms);
+            smsLoginBtn.setAttribute('aria-selected', String(isSms));
+        }
         if (loginSubmitBtn) loginSubmitBtn.textContent = isSms ? '验证码登录' : '登录';
     }
 
     setLoginMode('password');
 
     if (smsLoginBtn) {
-        smsLoginBtn.addEventListener('click', () => {
-            const mode = loginForm && loginForm.dataset.mode === 'sms' ? 'password' : 'sms';
-            setLoginMode(mode);
-        });
+        smsLoginBtn.addEventListener('click', () => setLoginMode('sms'));
+    }
+    if (passwordLoginBtn) {
+        passwordLoginBtn.addEventListener('click', () => setLoginMode('password'));
     }
 
     let loginCodeTimer = null;

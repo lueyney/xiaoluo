@@ -319,7 +319,21 @@ async function main() {
   const multiRouteCondition = JSON.parse(JSON.stringify(conditionFlow));
   multiRouteCondition.id = 'multi-route-condition';
   multiRouteCondition.nodes.find((node) => node.id === 'gate').data.routes.push({ key: 'maybe', label: '待定' });
-  assert.strictEqual(validateWorkflowCollection([multiRouteCondition]).valid, false);
+  multiRouteCondition.nodes.splice(4, 0, { id: 'maybe', type: 'transform', position: { x: 480, y: 80 }, data: { label: '待定' } });
+  multiRouteCondition.edges.push(
+    { id: 'cf-maybe', source: 'gate', sourceHandle: 'maybe', target: 'maybe', label: '待定' },
+    { id: 'cf-maybe-end', source: 'maybe', target: 'finish' }
+  );
+  assert.strictEqual(validateWorkflowCollection([multiRouteCondition]).valid, true);
+
+  const routeValueHandlers = createWorkflowHandlers({ provider: {}, config: {} });
+  const routeValue = await routeValueHandlers.condition({
+    node: { id: 'router', data: { mode: 'routeValue', conditionSource: 'output', routes: [
+      { key: 'paper', matchValues: ['1', '论文'] }, { key: 'report', matchValues: ['6', '开题报告'] }, { key: 'default', matchValues: [] }
+    ] } },
+    state: { context: { output: '6' } }
+  });
+  assert.strictEqual(routeValue.route, 'report');
 
   const transformHandlers = createWorkflowHandlers({ provider: {}, config: {} });
   const transformWorkflow = { name: '数据处理测试' };
