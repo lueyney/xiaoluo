@@ -264,15 +264,43 @@ async function rewriteWithDeepSeekFallback(text, rewriteVersion = 'v1', context 
   }
 }
 
-function isHeading(para) { return !/[\u3002\uff01\uff1f]/.test(para); }
+const SHORT_HEADING_MAX_CONTENT_LENGTH = 14;
+
+function isHeading(para, { firstContentParagraph = false } = {}) {
+  const text = String(para || '').trim();
+  if (!text) return false;
+
+  // A colon, semicolon or comma normally means this line is an introduction,
+  // list item or compact statement rather than a heading. The old rule treated
+  // every line without 。！？ as a heading, which skipped pasted web articles
+  // such as “爆发的三大成熟条件同时到来：” and numbered statements ending in ；.
+  if (/[\u3002\uff01\uff1f!?\uff0c,\uff1b;\uff1a:]/u.test(text)) return false;
+
+  // Preserve conventional academic section headings even when they are
+  // longer than a short label. A simple “1.” list item is deliberately not
+  // included here; only multi-level numbering such as 4.2 or 4.2.1 qualifies.
+  if (/^(?:第[一二三四五六七八九十百0-9]+[章节篇部]|(?:\d+\.)+\d+\s*\S)/u.test(text)) return true;
+  if (/^(?:摘\s*要|关键词|Abstract|References|参考文献|致谢|附录)$/iu.test(text)) return true;
+
+  // A document's first clean line is commonly its title. Pasted article titles
+  // containing clause punctuation have already been rejected above.
+  if (firstContentParagraph && effectiveContentLength(text) <= 40) return true;
+
+  // For all other lines, only a genuinely short label is considered a title.
+  // Longer standalone statements without terminal punctuation are rewritten.
+  return effectiveContentLength(text) <= SHORT_HEADING_MAX_CONTENT_LENGTH;
+}
 
 function splitSentences(text) {
   const sentences = [];
   const paragraphs = text.split(/\r\n|\n/);
+  let hasContent = false;
   for (let pIdx = 0; pIdx < paragraphs.length; pIdx++) {
     const para = paragraphs[pIdx].trim();
     if (!para) continue;
-    if (isHeading(para)) { sentences.push({ text: para, pIdx, isTitle: true }); continue; }
+    const firstContentParagraph = !hasContent;
+    hasContent = true;
+    if (isHeading(para, { firstContentParagraph })) { sentences.push({ text: para, pIdx, isTitle: true }); continue; }
     const parts = para.split(/(?<=[\u3002\uff01\uff1f])/);
     for (const part of parts) { const s = part.trim(); if (s) sentences.push({ text: s, pIdx, isTitle: false }); }
   }
@@ -352,6 +380,14 @@ async function rewriteSentences(sentences, {
       promptVariant: academicAlternation ? academicPromptVariantForIndex(tasks.length) : null
     });
   }
+  logger.info('AI降重任务拆分完成', {
+    model: process.env.DEEPSEEK_MODEL || 'deepseek-v4-pro',
+    rewriteVersion,
+    requestMode: 'one-sentence-per-request',
+    sentenceUnits: sentences.length,
+    requestCount: tasks.length,
+    skippedCount: sentences.length - tasks.length
+  });
 
   const workerCeiling = Math.min(
     256,
