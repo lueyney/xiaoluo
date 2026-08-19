@@ -7,7 +7,12 @@
  */
 
 const logger = require('../utils/logger');
-const { buildRewritePrompt, normalizeRewriteVersion } = require('./rewrite-prompts');
+const { buildRewriteMessages, buildRewritePrompt, normalizeRewriteVersion } = require('./rewrite-prompts');
+const {
+  applyDeepSeekReasoning,
+  logDeepSeekSelection,
+  resolveDeepSeekCall
+} = require('./ai-model-router');
 
 function extractMessageContent(payload) {
   const content = payload && payload.choices && payload.choices[0] && payload.choices[0].message
@@ -21,23 +26,27 @@ async function rewriteDocumentSentence(text, context = {}) {
   const apiKey = process.env.DEEPSEEK_API_KEY;
   if (!apiKey) throw new Error('AI降重服务未配置');
   const baseURL = (process.env.DEEPSEEK_API_BASE || 'https://api.deepseek.com').replace(/\/+$/, '');
-  const model = process.env.DEEPSEEK_MODEL || 'deepseek-v4-pro';
+  const selection = resolveDeepSeekCall('documentRewrite', {
+    model: context.model,
+    reasoningEffort: context.reasoningEffort,
+    thinking: context.thinking
+  });
   const rewriteVersion = normalizeRewriteVersion(context.rewriteVersion);
+  logDeepSeekSelection(logger, selection, { caller: 'rewriteDocumentSentence', traceId: context.traceId });
+  const requestPayload = applyDeepSeekReasoning({
+    model: selection.model,
+    messages: buildRewriteMessages(text, context),
+    temperature: Number(process.env.DEEPSEEK_DOCUMENT_REWRITE_TEMPERATURE || process.env.DEEPSEEK_REWRITE_TEMPERATURE || process.env.DEEPSEEK_TEMPERATURE || 0.7),
+    max_tokens: Number(process.env.DEEPSEEK_DOCUMENT_REWRITE_MAX_TOKENS || process.env.DEEPSEEK_REWRITE_MAX_TOKENS || process.env.DEEPSEEK_MAX_TOKENS || 8192),
+    stream: false
+  }, selection);
   const response = await fetch(baseURL + '/chat/completions', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
       Authorization: 'Bearer ' + apiKey
     },
-    body: JSON.stringify({
-      model,
-      messages: [{ role: 'user', content: buildRewritePrompt(text, rewriteVersion, context) }],
-      thinking: { type: 'enabled' },
-      reasoning_effort: 'low',
-      temperature: Number(process.env.DEEPSEEK_TEMPERATURE || 0.7),
-      max_tokens: Number(process.env.DEEPSEEK_MAX_TOKENS || 8192),
-      stream: false
-    })
+    body: JSON.stringify(requestPayload)
   });
   if (!response.ok) {
     const detail = await response.text();

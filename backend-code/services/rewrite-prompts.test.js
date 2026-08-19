@@ -1,35 +1,59 @@
 const {
+  ACADEMIC_V1_REWRITE_PROMPT_A,
+  ACADEMIC_V1_REWRITE_PROMPT_B,
+  REWRITE_INPUT_TEMPLATE,
+  REWRITE_PROMPT,
   academicPromptVariantForIndex,
+  buildRewriteMessages,
   buildRewritePrompt,
-  normalizeAcademicPromptVariant
+  getRewritePrompt
 } = require('./rewrite-prompts');
 
-describe('academic V1 prompt selection', () => {
-  test('alternates deterministically from A and remains stable by index', () => {
-    expect([0, 1, 2, 3, 4].map(academicPromptVariantForIndex)).toEqual(['A', 'B', 'A', 'B', 'A']);
-    expect(academicPromptVariantForIndex(1)).toBe('B');
-    expect(academicPromptVariantForIndex(1)).toBe('B');
+describe('unified rewrite prompt', () => {
+  test('all prompt slots and versions use exactly the same prompt', () => {
+    expect(ACADEMIC_V1_REWRITE_PROMPT_A).toBe(REWRITE_PROMPT);
+    expect(ACADEMIC_V1_REWRITE_PROMPT_B).toBe(REWRITE_PROMPT);
+    expect(getRewritePrompt('v1', { promptVariant: 'A' })).toBe(REWRITE_PROMPT);
+    expect(getRewritePrompt('v1', { promptVariant: 'B' })).toBe(REWRITE_PROMPT);
+    expect(getRewritePrompt('v2')).toBe(REWRITE_PROMPT);
+    expect(getRewritePrompt('v3')).toBe(REWRITE_PROMPT);
   });
 
-  test('legacy B slots use the same Prompt A and remain stable across retries', () => {
-    expect(normalizeAcademicPromptVariant('B', 0)).toBe('B');
-    const context = { promptVariant: 'B', previousSentence: '上句。', nextSentence: '下句。' };
-    const first = buildRewritePrompt('当前句。', 'v1', context);
-    const retry = buildRewritePrompt('当前句。', 'v1', context);
-    expect(first).toBe(retry);
-    expect(first).toContain('并列内容必须调整主次');
-    expect(first).not.toContain('严格按照下面方法进行降重');
-    expect(first).toContain('当前待处理文本（只改写这一句）：\n当前句。');
+  test('first sentence has no previous-sentence addition', () => {
+    const messages = buildRewriteMessages('当前句。');
+    expect(messages).toEqual([
+      { role: 'system', content: REWRITE_PROMPT },
+      { role: 'user', content: '处理括号中的文本，仅返回降AI结果：【当前句。】' }
+    ]);
+    expect(messages[1].content).not.toContain('上一句');
   });
 
-  test('A and B render exactly the same academic prompt', () => {
-    const promptA = buildRewritePrompt('当前句。', 'v1', { promptVariant: 'A' });
-    const promptB = buildRewritePrompt('当前句。', 'v1', { promptVariant: 'B' });
-    expect(promptB).toBe(promptA);
-    expect(promptA).toContain('并列内容必须调整主次');
-    expect(promptA).not.toContain('不得改变事实关系、数字、专有名词、引用、核心专业术语、专业含义和论证方向');
-    expect(promptA).not.toContain('只改写当前一句，只输出改写结果');
-    expect(promptA).toContain('上文（仅作结构参照）：\n（无上文）');
-    expect(promptA).toContain('下文（仅作结构参照）：\n（无下文）');
+  test('original previous sentence is never injected', () => {
+    const messages = buildRewriteMessages('当前句。', {
+      previousSentence: '上一句。',
+      nextSentence: '下一句。'
+    });
+    expect(messages[1].content).toBe('处理括号中的文本，仅返回降AI结果：【当前句。】');
+    expect(messages[1].content).not.toContain('上一句。');
+  });
+
+  test('later sentences in the same group include only rewritten context', () => {
+    const messages = buildRewriteMessages('当前句。', {
+      previousSentence: '上一句原文。',
+      previousRewrittenSentence: '上一句降AI结果。'
+    });
+    expect(messages[1].content).toBe(
+      '上一句：【上一句降AI结果。】\n降重后禁止与上一句的句式和表达方式一致。\n处理括号中的文本，仅返回降AI结果：【当前句。】'
+    );
+    expect(messages[1].content).not.toContain('上一句原文。');
+  });
+
+  test('keeps one combined-prompt adapter without context additions', () => {
+    expect(REWRITE_INPUT_TEMPLATE).toBe('处理括号中的文本，仅返回降AI结果：【{{input}}】');
+    expect(buildRewritePrompt('当前句。')).toBe(`${REWRITE_PROMPT}\n处理括号中的文本，仅返回降AI结果：【当前句。】`);
+  });
+
+  test('keeps stable legacy sentence-slot indexing', () => {
+    expect([0, 1, 2, 3].map(academicPromptVariantForIndex)).toEqual(['A', 'B', 'A', 'B']);
   });
 });

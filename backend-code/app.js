@@ -3,7 +3,7 @@ const cors = require('cors');
 const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
 const path = require('path');
-require('dotenv').config();
+const envState = require('./config/load-env');
 
 const logger = require('./utils/logger');
 const db = require('./config/database');
@@ -29,7 +29,6 @@ const douyinAuthRoutes = require('./routes/douyin-auth');
 const douyinPayRoutes = require('./routes/douyin-pay');
 const { startCleanupJob } = require('./utils/cleanup-orders');
 const { query, transaction } = require('./config/database');
-const { registerSeoPages } = require('./seo-pages');
 
 const app = express();
 const PORT = Number(process.env.PORT) || 3001;
@@ -262,7 +261,20 @@ app.use('/static', express.static(staticDir, {
 }));
 
 const webFrontendDir = path.join(__dirname, '../web-frontend');
-registerSeoPages(app);
+// 历史 SEO 落地页已取消，旧路径直接进入同一套产品工作台。
+const workspaceRedirects = {
+  '/ai-writing': 'writing',
+  '/paper-rewrite': 'rewrite',
+  '/document-rewrite': 'document-rewrite',
+  '/opening-report': 'writing',
+  '/literature-review': 'writing',
+  '/task-book': 'writing',
+  '/defense-script': 'writing',
+  '/pricing': 'orders'
+};
+Object.entries(workspaceRedirects).forEach(([pathname, page]) => {
+  app.get([pathname, `${pathname}/`], (req, res) => res.redirect(302, `/#${page}`));
+});
 app.use(express.static(webFrontendDir, {
   maxAge: '0',
   etag: false,
@@ -321,6 +333,7 @@ const server = app.listen(PORT, '0.0.0.0', async () => {
   console.log(`Web入口: http://localhost:${PORT}`);
   console.log(`API入口: http://localhost:${PORT}/api`);
   console.log(`健康检查: http://localhost:${PORT}/health`);
+  console.log(`环境配置: ${envState.envPath}${envState.loaded ? '' : '（文件不存在或未加载）'}`);
   console.log('========================================');
   console.log('');
 

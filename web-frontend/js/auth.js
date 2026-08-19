@@ -136,7 +136,7 @@ class Auth {
         localStorage.removeItem('user_info');
         localStorage.removeItem('user_credits');
         this.updateUI();
-        window.router.navigate('home');
+        window.router.navigate('writing');
         utils.showToast('已退出登录', 'success');
     }
 
@@ -169,7 +169,6 @@ class Auth {
         const userCredits = document.getElementById('userCredits');
         const avatarLetter = document.getElementById('accountAvatarLetter');
         const inviteCode = document.getElementById('navInviteCode');
-        const homeNavLink = document.querySelector('.nav-link[data-page="home"]');
         const authOnlyLinks = document.querySelectorAll('.nav-link[data-auth-only]');
 
         if (!loginBtn || !userInfo) {
@@ -177,7 +176,6 @@ class Auth {
         }
 
         if (this.isLoggedIn()) {
-            if (homeNavLink) homeNavLink.style.display = 'none';
             authOnlyLinks.forEach(link => { link.style.display = ''; });
             loginBtn.style.display = 'none';
             userInfo.style.display = 'flex';
@@ -187,7 +185,6 @@ class Auth {
             if (avatarLetter) avatarLetter.textContent = String(displayName).trim().charAt(0).toUpperCase() || '用';
             if (inviteCode) inviteCode.textContent = this.userInfo.inviteCode || '--';
         } else {
-            if (homeNavLink) homeNavLink.style.display = '';
             authOnlyLinks.forEach(link => { link.style.display = 'none'; });
             if (window.closeAccountMenu) window.closeAccountMenu();
             loginBtn.style.display = 'block';

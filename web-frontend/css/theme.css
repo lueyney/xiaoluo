@@ -3403,13 +3403,13 @@ body:not(.light-theme) .auth-agree-label a { color:#8edce9; }
   .auth-register-passwords { grid-template-columns:1fr; gap:0; }
 }
 
-/* Authentication v7 final layer: branded primary switch and original girl cover. */
+/* Authentication v7 final layer: branded primary switch and campus-horizon anime cover. */
 .auth-brand-panel {
   position:relative;
   background:
-    linear-gradient(180deg,rgba(255,255,255,.05),transparent 25%),
-    url("../assets/auth-anime-single-v9.webp") 50% 48%/cover no-repeat,
-    #a7dbd8;
+    linear-gradient(180deg,rgba(247,252,251,.12),rgba(247,252,251,.02) 40%,rgba(17,43,70,.04)),
+    url("../assets/auth-campus-horizon-v4.jpg") 50% 55%/cover no-repeat,
+    #dff4ef;
 }
 .auth-brand-signature {
   position:absolute;
@@ -4022,7 +4022,10 @@ body:not(.light-theme) #authModal .auth-code-group .btn {
   transition:background-color 99999s ease-out 0s !important;
 }
 @media (max-width:760px) {
-  .auth-brand-panel { background-position:50% 36%; }
+  .auth-brand-panel { background-position:50% 80%; }
+}
+@media (max-width:460px) {
+  .auth-brand-panel { flex-basis:156px; min-height:156px; }
 }
 
 /* Home v2: restrained product overview with a real interactive feature selector. */
@@ -4171,8 +4174,20 @@ body.light-theme .home-v2-preview { box-shadow:0 22px 60px rgba(37,76,112,.09); 
 /* Product polish v17: one-step access, a lighter writing field and a clearer home journey. */
 .nav-brand > img,
 .auth-brand-signature .auth-brand-logo {
-  object-fit:contain;
-  background:transparent;
+  object-fit:cover;
+  object-position:center;
+  background:#f7fcfb;
+}
+.nav-brand > img {
+  flex:0 0 34px;
+  width:34px;
+  height:34px;
+  margin-right:9px;
+  border-radius:10px;
+  box-shadow:none !important;
+}
+.auth-brand-signature .auth-brand-logo {
+  box-shadow:none !important;
 }
 .nav-brand { color:#f1f6ed !important; letter-spacing:0; }
 body.light-theme .nav-brand { color:#112b46 !important; }

@@ -1,5 +1,10 @@
 const axios = require('axios');
 const { extractJson, safeErrorMessage, sleep } = require('../utils');
+const {
+  applyDeepSeekReasoning,
+  logDeepSeekSelection,
+  resolveDeepSeekCall
+} = require('../../ai-model-router');
 
 class ConcurrencyGate {
   constructor(limit) {
@@ -64,15 +69,17 @@ class DeepSeekProvider {
     return !status || status === 408 || status === 409 || status === 429 || status >= 500;
   }
 
-  async chat({ messages, model, temperature, maxTokens, json = false, traceId, step }) {
+  async chat({ messages, model, temperature, maxTokens, json = false, traceId, step, task = 'workflow', reasoningEffort, thinking }) {
     this.assertConfigured();
     const startedAt = Date.now();
     let lastError;
+    const selection = resolveDeepSeekCall(task, { model, reasoningEffort, thinking });
+    logDeepSeekSelection(this.logger, selection, { caller: `DeepSeekProvider.${step || 'chat'}`, traceId });
 
     for (let attempt = 0; attempt <= this.config.maxRetries; attempt += 1) {
       try {
-        const payload = {
-          model,
+        let payload = {
+          model: selection.model,
           messages,
           temperature: temperature ?? this.config.temperature,
           max_tokens: maxTokens || this.config.maxOutputTokens,
@@ -80,6 +87,7 @@ class DeepSeekProvider {
         };
 
         if (json) payload.response_format = { type: 'json_object' };
+        payload = applyDeepSeekReasoning(payload, selection);
 
         const release = await this.gate.acquire();
         try {
@@ -91,7 +99,7 @@ class DeepSeekProvider {
         const result = {
           content,
           data: json ? extractJson(content) : null,
-          model: response.data.model || model,
+          model: response.data.model || selection.model,
           usage: response.data.usage || null,
           durationMs: Date.now() - startedAt
         };
@@ -126,6 +134,7 @@ class DeepSeekProvider {
     return this.chat({
       messages,
       model: model || this.config.planningModel,
+      task: 'planning',
       temperature: temperature ?? 0.25,
       maxTokens: maxTokens || 4096,
       json: true,
@@ -138,6 +147,7 @@ class DeepSeekProvider {
     return this.chat({
       messages,
       model: model || this.config.draftingModel,
+      task: 'drafting',
       temperature: temperature ?? this.config.temperature,
       maxTokens: maxTokens || this.config.maxOutputTokens,
       traceId,
@@ -149,6 +159,7 @@ class DeepSeekProvider {
     return this.chat({
       messages,
       model: this.config.titleModel,
+      task: 'title',
       temperature: 0.8,
       maxTokens: 512,
       traceId,

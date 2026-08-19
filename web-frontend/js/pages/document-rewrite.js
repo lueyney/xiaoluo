@@ -154,7 +154,7 @@
             if (typeof window.auth.updateUI === 'function') window.auth.updateUI();
         }
         notify('登录已过期，请重新登录', 'error');
-        if (window.router) window.router.navigate('home', true);
+        if (window.router) window.router.navigate('writing', true);
         setTimeout(function () { if (window.auth) window.auth.showAuthModal(); }, 0);
     }
 
@@ -563,7 +563,7 @@
     router.register('document-rewrite', function () {
         if (!auth.isLoggedIn()) {
             notify('请先登录后再使用文档降重', 'warning');
-            router.navigate('home', true);
+            router.navigate('writing', true);
             setTimeout(function () { if (window.auth) auth.showAuthModal(); }, 0);
             return;
         }

@@ -8,13 +8,34 @@ const { authenticateToken } = require('../middleware/auth');
 const logger = require('../utils/logger');
 const {
   academicPromptVariantForIndex,
-  buildRewritePrompt,
+  buildRewriteMessages,
   normalizeRewriteVersion
 } = require('../services/rewrite-prompts');
-require('dotenv').config();
+const {
+  applyDeepSeekReasoning,
+  logDeepSeekSelection,
+  resolveDeepSeekCall
+} = require('../services/ai-model-router');
+const { groupRewriteTasks, buildChainedRewriteContext } = require('../services/rewrite-groups');
 
 const router = express.Router();
-router.use(authenticateToken);
+const LOCAL_REWRITE_TEST_MODE = process.env.NODE_ENV !== 'production'
+  && process.env.LOCAL_REWRITE_TEST_MODE === 'true';
+
+router.get('/mode', (req, res) => {
+  res.json({
+    code: 'SUCCESS',
+    data: { localTestMode: LOCAL_REWRITE_TEST_MODE }
+  });
+});
+
+router.use((req, res, next) => {
+  if (LOCAL_REWRITE_TEST_MODE && req.path === '/stream' && req.method === 'POST') {
+    req.user = { id: 0, phone: 'local-test', nickname: '本地测试' };
+    return next();
+  }
+  return authenticateToken(req, res, next);
+});
 
 // Account concurrency can be 500 while the application deliberately keeps
 // headroom for retries, multiple users, and other DeepSeek-backed features.
@@ -102,26 +123,30 @@ async function rewriteWithDeepSeek(text, onDelta, rewriteVersion = 'v1', options
   try {
     const apiKey = process.env.DEEPSEEK_API_KEY;
     const baseURL = (process.env.DEEPSEEK_API_BASE || 'https://api.deepseek.com').replace(/\/+$/, '');
-    const model = process.env.DEEPSEEK_MODEL || 'deepseek-v4-pro';
+    const selection = resolveDeepSeekCall('rewrite', {
+      model: options.model,
+      reasoningEffort: options.reasoningEffort,
+      thinking: options.thinking
+    });
     if (!apiKey) throw createDeepSeekError('AI降重服务未配置', { retryable: false, code: 'AI_NOT_CONFIGURED' });
+    logDeepSeekSelection(logger, selection, { caller: 'rewriteWithDeepSeek' });
 
     let response;
     try {
+      const requestPayload = applyDeepSeekReasoning({
+        model: selection.model,
+        messages: buildRewriteMessages(text, options.context),
+        temperature: Number(process.env.DEEPSEEK_REWRITE_TEMPERATURE || process.env.DEEPSEEK_TEMPERATURE || 0.7),
+        max_tokens: Number(process.env.DEEPSEEK_REWRITE_MAX_TOKENS || process.env.DEEPSEEK_MAX_TOKENS || 8192),
+        stream: true
+      }, selection);
       response = await fetch(baseURL + '/chat/completions', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           Authorization: 'Bearer ' + apiKey
         },
-        body: JSON.stringify({
-          model,
-          messages: [{ role: 'user', content: buildRewritePrompt(text, rewriteVersion, options.context) }],
-          thinking: { type: 'enabled' },
-          reasoning_effort: 'low',
-          temperature: Number(process.env.DEEPSEEK_TEMPERATURE || 0.7),
-          max_tokens: Number(process.env.DEEPSEEK_MAX_TOKENS || 8192),
-          stream: true
-        }),
+        body: JSON.stringify(requestPayload),
         signal: controller.signal
       });
     } catch (error) {
@@ -214,25 +239,25 @@ async function rewriteWithDeepSeekFallback(text, rewriteVersion = 'v1', context 
   try {
     const apiKey = process.env.DEEPSEEK_API_KEY;
     const baseURL = (process.env.DEEPSEEK_API_BASE || 'https://api.deepseek.com').replace(/\/+$/, '');
-    const model = process.env.DEEPSEEK_FALLBACK_MODEL || process.env.DEEPSEEK_MODEL || 'deepseek-v4-pro';
+    const selection = resolveDeepSeekCall('rewriteFallback');
     if (!apiKey) throw createDeepSeekError('AI降重服务未配置', { retryable: false, code: 'AI_NOT_CONFIGURED' });
+    logDeepSeekSelection(logger, selection, { caller: 'rewriteWithDeepSeekFallback' });
     let response;
     try {
+      const requestPayload = applyDeepSeekReasoning({
+        model: selection.model,
+        messages: buildRewriteMessages(text, context),
+        temperature: Number(process.env.DEEPSEEK_REWRITE_TEMPERATURE || process.env.DEEPSEEK_TEMPERATURE || 0.7),
+        max_tokens: Number(process.env.DEEPSEEK_REWRITE_MAX_TOKENS || process.env.DEEPSEEK_MAX_TOKENS || 8192),
+        stream: false
+      }, selection);
       response = await fetch(baseURL + '/chat/completions', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           Authorization: 'Bearer ' + apiKey
         },
-        body: JSON.stringify({
-          model,
-          messages: [{ role: 'user', content: buildRewritePrompt(text, rewriteVersion, context) }],
-          thinking: { type: 'enabled' },
-          reasoning_effort: 'low',
-          temperature: Number(process.env.DEEPSEEK_TEMPERATURE || 0.7),
-          max_tokens: Number(process.env.DEEPSEEK_MAX_TOKENS || 8192),
-          stream: false
-        }),
+        body: JSON.stringify(requestPayload),
         signal: controller.signal
       });
     } catch (error) {
@@ -269,7 +294,6 @@ const SHORT_HEADING_MAX_CONTENT_LENGTH = 14;
 function isHeading(para, { firstContentParagraph = false } = {}) {
   const text = String(para || '').trim();
   if (!text) return false;
-
   // A colon, semicolon or comma normally means this line is an introduction,
   // list item or compact statement rather than a heading. The old rule treated
   // every line without 。！？ as a heading, which skipped pasted web articles
@@ -314,23 +338,55 @@ function assembleParagraphs(sentences, results) {
     if (!paraMap.has(pIdx)) paraMap.set(pIdx, []);
     paraMap.get(pIdx).push(results[i]);
   }
-  return Array.from(paraMap.keys()).sort((a,b)=>a-b).map(pIdx=>paraMap.get(pIdx).join('').trim()).filter(p=>p).join('\n');
+  const paragraphEntries = Array.from(paraMap.keys())
+    .sort((a, b) => a - b)
+    .map((pIdx) => ({
+      pIdx,
+      text: paraMap.get(pIdx).join('').trim()
+    }))
+    .filter((entry) => entry.text);
+  let output = '';
+  for (let i = 0; i < paragraphEntries.length; i++) {
+    const entry = paragraphEntries[i];
+    if (i > 0) {
+      const previous = paragraphEntries[i - 1];
+      output += '\n'.repeat(Math.max(1, entry.pIdx - previous.pIdx));
+    }
+    output += entry.text;
+  }
+  return output.trim();
 }
 
 function ensureEndPunct(original, rewritten) {
   if (!rewritten) return rewritten;
-  const cleaned = rewritten.trim();
+  // One source sentence owns one output slot. Remove model-introduced line
+  // breaks so grouping/concurrency can never create extra paragraphs.
+  const cleaned = rewritten.replace(/[\r\n]+/g, '').trim();
   if (!cleaned) return original.trim();
   const PUNCTS = /[\u3002\uff01\uff1f]$/;
   if (PUNCTS.test(original.trim()) && !PUNCTS.test(cleaned)) return cleaned + original.trim().slice(-1);
   return cleaned;
 }
 
-const POLLUTION_WORDS = ['降重','介词转换','陈述主体的具象化','宾语概念的泛化','提示词','语言模型'];
-// DeepSeek's advertised concurrency is an upstream ceiling, not a safe
-// per-process default. Keep the existing interactive rewrite behavior at 16
-// and give document jobs their own bounded, environment-controlled pool.
-const REWRITE_CONCURRENCY = 16;
+// Four effective sentences form one serial chain. Chains run concurrently so
+// each sentence can consume the previous rewritten result without turning the
+// whole document into one long serial job.
+const REWRITE_GROUP_SIZE = Math.min(
+  16,
+  Math.max(1, Number.parseInt(process.env.REWRITE_GROUP_SIZE || '4', 10) || 4)
+);
+const REWRITE_CONCURRENCY = Math.min(
+  DEEPSEEK_GLOBAL_CONCURRENCY,
+  Math.max(1, Number.parseInt(process.env.REWRITE_GROUP_CONCURRENCY || '128', 10) || 128)
+);
+const REWRITE_INITIAL_CONCURRENCY = Math.min(
+  REWRITE_CONCURRENCY,
+  Math.max(1, Number.parseInt(process.env.REWRITE_GROUP_INITIAL_CONCURRENCY || '16', 10) || 16)
+);
+const REWRITE_MIN_CONCURRENCY = Math.min(
+  REWRITE_INITIAL_CONCURRENCY,
+  Math.max(1, Number.parseInt(process.env.REWRITE_GROUP_MIN_CONCURRENCY || '4', 10) || 4)
+);
 const DOCUMENT_REWRITE_CONCURRENCY = Math.min(
   256,
   Math.max(1, Number.parseInt(process.env.DOCUMENT_REWRITE_CONCURRENCY || '128', 10) || 128)
@@ -356,12 +412,10 @@ async function rewriteSentences(sentences, {
   onDelta,
   onResult,
   rewriteVersion = 'v1',
-  // Callers can opt into the document-job pool without changing the normal
-  // /api/rewrite route's established concurrency.
   concurrency = REWRITE_CONCURRENCY,
-  adaptiveConcurrency = false,
-  initialConcurrency = DOCUMENT_REWRITE_INITIAL_CONCURRENCY,
-  minConcurrency = DOCUMENT_REWRITE_MIN_CONCURRENCY,
+  adaptiveConcurrency = true,
+  initialConcurrency = REWRITE_INITIAL_CONCURRENCY,
+  minConcurrency = REWRITE_MIN_CONCURRENCY,
   maxRetries = adaptiveConcurrency ? DEEPSEEK_RETRY_MAX : 0
 } = {}) {
   const results = sentences.map((sentObj) => sentObj.text);
@@ -388,6 +442,7 @@ async function rewriteSentences(sentences, {
     requestCount: tasks.length,
     skippedCount: sentences.length - tasks.length
   });
+  const groups = groupRewriteTasks(tasks, REWRITE_GROUP_SIZE);
 
   const workerCeiling = Math.min(
     256,
@@ -416,16 +471,9 @@ async function rewriteSentences(sentences, {
     return Math.max(Number(error && error.retryAfterMs) || 0, exponential + jitter);
   }
 
-  async function executeTask(task, reportPressure) {
+  async function executeTask(task, reportPressure, previousTask = null) {
     const { idx, sentObj, promptVariant } = task;
-    // Context is taken from the immutable source sentence list. In a
-    // concurrent job, never use a neighbour's rewritten result because
-    // completion order is nondeterministic.
-    const context = {
-      previousSentence: idx > 0 && sentences[idx - 1] ? sentences[idx - 1].text : '',
-      nextSentence: idx + 1 < sentences.length && sentences[idx + 1] ? sentences[idx + 1].text : '',
-      promptVariant
-    };
+    const context = buildChainedRewriteContext(sentences, results, task, previousTask);
     let lastError = null;
     let attempts = 0;
     let pressure = false;
@@ -436,10 +484,9 @@ async function rewriteSentences(sentences, {
         const rewritten = await rewriteWithDeepSeek(sentObj.text, (delta) => {
           if (delta && onDelta) onDelta(delta, idx, sentObj);
         }, rewriteVersion, { context });
-        const polluted = rewritten && POLLUTION_WORDS.some((word) => rewritten.includes(word));
-        if (!rewritten || polluted) {
+        if (!rewritten) {
           throw createDeepSeekError('DeepSeek 返回内容不可用', {
-            code: polluted ? 'DEEPSEEK_POLLUTED_OUTPUT' : 'DEEPSEEK_EMPTY_OUTPUT',
+            code: 'DEEPSEEK_EMPTY_OUTPUT',
             retryable: true
           });
         }
@@ -462,10 +509,9 @@ async function rewriteSentences(sentences, {
       try {
         attempts += 1;
         const fallbackText = await rewriteWithDeepSeekFallback(sentObj.text, rewriteVersion, context);
-        const polluted = POLLUTION_WORDS.some((word) => fallbackText.includes(word));
-        if (!fallbackText || polluted) {
+        if (!fallbackText) {
           throw createDeepSeekError('DeepSeek fallback 返回内容不可用', {
-            code: polluted ? 'DEEPSEEK_FALLBACK_POLLUTED_OUTPUT' : 'DEEPSEEK_FALLBACK_EMPTY_OUTPUT',
+            code: 'DEEPSEEK_FALLBACK_EMPTY_OUTPUT',
             retryable: false
           });
         }
@@ -502,7 +548,7 @@ async function rewriteSentences(sentences, {
     };
   }
 
-  let nextTask = 0;
+  let nextGroup = 0;
   let active = 0;
   let settled = 0;
 
@@ -525,22 +571,38 @@ async function rewriteSentences(sentences, {
     }
 
     function launch() {
-      while (active < currentLimit && nextTask < tasks.length) {
-        const task = tasks[nextTask++];
+      while (active < currentLimit && nextGroup < groups.length) {
+        const group = groups[nextGroup++];
         active += 1;
-        executeTask(task, () => tune({ pressure: true, failed: false, skipIncrease: true })).then((outcome) => {
+        (async () => {
+          let previousTask = null;
+          let groupPressure = false;
+          let groupFailed = false;
+          let groupSkipIncrease = false;
+          for (const task of group) {
+            const outcome = await executeTask(task, () => {
+              groupPressure = true;
+              tune({ pressure: true, failed: false, skipIncrease: true });
+            }, previousTask);
+            groupPressure = groupPressure || outcome.pressure;
+            groupFailed = groupFailed || outcome.failed;
+            groupSkipIncrease = groupSkipIncrease || outcome.skipIncrease;
+            if (onResult) onResult(results[task.idx], task.idx, task.sentObj, outcome.failed, {
+              attempts: outcome.attempts,
+              fallback: outcome.failed,
+              recoveredByFallback: !!outcome.recoveredByFallback,
+              promptVariant: task.promptVariant,
+              concurrency: currentLimit
+            });
+            previousTask = outcome.failed ? null : task;
+          }
+          return { failed: groupFailed, pressure: groupPressure, skipIncrease: groupSkipIncrease };
+        })().then((outcome) => {
           tune(outcome);
-          if (onResult) onResult(results[task.idx], task.idx, task.sentObj, outcome.failed, {
-            attempts: outcome.attempts,
-            fallback: outcome.failed,
-            recoveredByFallback: !!outcome.recoveredByFallback,
-            promptVariant: task.promptVariant,
-            concurrency: currentLimit
-          });
         }).finally(() => {
           active -= 1;
           settled += 1;
-          if (settled >= tasks.length) resolve();
+          if (settled >= groups.length) resolve();
           else launch();
         });
       }
@@ -605,11 +667,13 @@ router.post('/stream', [
   const rewriteVersion = normalizeRewriteVersion(req.body.rewriteVersion);
   const wordCount = originalText.length;
   const creditsCost = Math.ceil(wordCount / 1000 * 18);
-  const creditRows = await query('SELECT credits FROM user_credits WHERE user_id = ?', [userId]);
-  const creditResult = creditRows[0];
-  if (!creditResult || creditResult.credits < creditsCost) {
-    return res.status(400).json({ error: '积分不足', code: 'INSUFFICIENT_CREDITS',
-      data: { required: creditsCost, available: (creditResult && creditResult.credits) || 0 } });
+  if (!LOCAL_REWRITE_TEST_MODE) {
+    const creditRows = await query('SELECT credits FROM user_credits WHERE user_id = ?', [userId]);
+    const creditResult = creditRows[0];
+    if (!creditResult || creditResult.credits < creditsCost) {
+      return res.status(400).json({ error: '积分不足', code: 'INSUFFICIENT_CREDITS',
+        data: { required: creditsCost, available: (creditResult && creditResult.credits) || 0 } });
+    }
   }
   res.setHeader('Content-Type', 'text/event-stream');
   res.setHeader('Cache-Control', 'no-cache');
@@ -628,7 +692,14 @@ router.post('/stream', [
     srcLen: (s.text && s.text.length) || 1,
     text: s.text || ''
   }));
-  sendEvent('start', { total, wordCount, creditsCost, sentencesMeta, rewriteVersion });
+  sendEvent('start', {
+    total,
+    wordCount,
+    creditsCost: LOCAL_REWRITE_TEST_MODE ? 0 : creditsCost,
+    sentencesMeta,
+    rewriteVersion,
+    localTestMode: LOCAL_REWRITE_TEST_MODE
+  });
   sentences.forEach((sentObj, idx) => {
     if (!shouldRewriteSentence(sentObj)) {
       sendEvent('sentence', { index: idx, total, text: sentObj.text, isTitle: sentObj.isTitle, pIdx: sentObj.pIdx, failed: false });
@@ -644,11 +715,19 @@ router.post('/stream', [
         sendEvent('sentence', { index: idx, total, text, isTitle: false, pIdx: sentObj.pIdx, failed });
       }
     });
-    // 最终降重正文仍由 assembleParagraphs 汇总；逐句逻辑与流式前一致（DeepSeek 返回值经 ensureEndPunct/污染检测后写入 sentence，仅多向前端推送 delta 展示）
+    // 最终降重正文仍由 assembleParagraphs 汇总；逐句逻辑与流式前一致（DeepSeek 返回值经 ensureEndPunct 后写入 sentence，仅多向前端推送 delta 展示）
     const rewrittenText = assembleParagraphs(sentences, results);
-    sendEvent('done', { creditsCost, failedCount, totalSentences: total, rewrittenText });
-    finalizeOrder(userId, null, rewrittenText, wordCount, creditsCost)
-      .catch((dbErr) => { logger.error('\u5b58\u6863\u5931\u8d25: ' + dbErr.message); });
+    sendEvent('done', {
+      creditsCost: LOCAL_REWRITE_TEST_MODE ? 0 : creditsCost,
+      failedCount,
+      totalSentences: total,
+      rewrittenText,
+      localTestMode: LOCAL_REWRITE_TEST_MODE
+    });
+    if (!LOCAL_REWRITE_TEST_MODE) {
+      finalizeOrder(userId, null, rewrittenText, wordCount, creditsCost)
+        .catch((dbErr) => { logger.error('\u5b58\u6863\u5931\u8d25: ' + dbErr.message); });
+    }
   } catch (err) {
     sendEvent('error', { message: err.message || '降重失败' });
   } finally { res.end(); }
@@ -736,7 +815,7 @@ router.get('/result/:orderId', async (req, res) => {
 // The document workflow consumes the exact same sentence splitter and DeepSeek
 // rewrite pipeline.  These references are an internal integration seam only;
 // the existing /api/rewrite routes and their behavior remain unchanged.
-router.documentRewritePipeline = { splitSentences, rewriteSentences, assembleParagraphs };
+router.documentRewritePipeline = { splitSentences, rewriteSentences, assembleParagraphs, ensureEndPunct };
 
 module.exports = router;
 

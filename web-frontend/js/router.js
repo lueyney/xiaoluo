@@ -36,18 +36,19 @@ class Router {
         });
 
         // 加载初始页面
-        const hash = window.location.hash.slice(1) || 'home';
+        const hash = window.location.hash.slice(1) || 'writing';
         console.log('Router: 加载初始页面 -', hash);
         this.navigate(hash, true);
     }
 
     // 导航到页面
     navigate(page, replace = false) {
-        if (page === 'profile') {
-            page = window.auth && auth.isLoggedIn() ? 'writing' : 'home';
+        // 兼容旧首页链接；产品入口统一进入实际工作台。
+        if (page === 'home') {
+            page = 'writing';
             replace = true;
         }
-        if (page === 'home' && window.auth && auth.isLoggedIn()) {
+        if (page === 'profile') {
             page = 'writing';
             replace = true;
         }
@@ -71,20 +72,20 @@ class Router {
     loadPage(page, updateNav = true) {
         console.log('Router: 加载页面 -', page);
 
-        if (page === 'profile' || (page === 'home' && window.auth && auth.isLoggedIn())) {
-            page = window.auth && auth.isLoggedIn() ? 'writing' : 'home';
+        if (page === 'profile' || page === 'home') {
+            page = 'writing';
             window.history.replaceState({ page }, '', '#' + page);
         }
         
         // 检查路由是否存在
         if (!this.routes[page]) {
             console.error('Router: 页面不存在 -', page);
-            page = 'home';
+            page = 'writing';
             window.history.replaceState({ page }, '', '#' + page);
         }
 
-        // 公共落地页采用独立的明亮品牌外观，离开首页后立即恢复工作台主题。
-        document.body.classList.toggle('public-home-view', page === 'home');
+        // 营销落地页已移除，所有路由统一使用工作台主题。
+        document.body.classList.remove('public-home-view');
 
         // 检查路由处理器是否是函数
         if (typeof this.routes[page] !== 'function') {

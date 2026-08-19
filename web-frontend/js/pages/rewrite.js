@@ -26,6 +26,18 @@ let rewriteState = {
     animatedProgressValue: 0
 };
 
+let rewriteModePromise = null;
+
+function getRewriteMode() {
+    if (!rewriteModePromise) {
+        rewriteModePromise = fetch(`${CONFIG.API_BASE_URL}/rewrite/mode`)
+            .then(response => response.ok ? response.json() : null)
+            .then(payload => ({ localTestMode: !!(payload && payload.data && payload.data.localTestMode) }))
+            .catch(() => ({ localTestMode: false }));
+    }
+    return rewriteModePromise;
+}
+
 function clearRewriteTimers() {
     if (rewriteState.streamTimer) {
         clearInterval(rewriteState.streamTimer);
@@ -140,7 +152,15 @@ function snapProgressToDisplayedBatch() {
 function buildRenderedRewriteText() {
     var paragraphs = [];
     var currentParagraph = [];
+    var currentParagraphPIdx = null;
     var lastPIdx = null;
+
+    function flushParagraph() {
+        if (!currentParagraph.length) return;
+        paragraphs.push({ pIdx: currentParagraphPIdx, text: currentParagraph.join('') });
+        currentParagraph = [];
+        currentParagraphPIdx = null;
+    }
 
     for (var i = 0; i < rewriteState.renderedTexts.length; i++) {
         var text = rewriteState.renderedTexts[i];
@@ -150,29 +170,37 @@ function buildRenderedRewriteText() {
         }
 
         if (meta.isTitle) {
-            if (currentParagraph.length) {
-                paragraphs.push(currentParagraph.join(''));
-                currentParagraph = [];
-            }
-            paragraphs.push(String(text));
+            flushParagraph();
+            paragraphs.push({ pIdx: meta.pIdx, text: String(text) });
             lastPIdx = null;
             continue;
         }
 
         if (lastPIdx !== null && meta.pIdx !== lastPIdx && currentParagraph.length) {
-            paragraphs.push(currentParagraph.join(''));
-            currentParagraph = [];
+            flushParagraph();
         }
 
+        if (!currentParagraph.length) currentParagraphPIdx = meta.pIdx;
         currentParagraph.push(String(text));
         lastPIdx = meta.pIdx;
     }
 
-    if (currentParagraph.length) {
-        paragraphs.push(currentParagraph.join(''));
+    flushParagraph();
+
+    var output = '';
+    for (var paragraphIndex = 0; paragraphIndex < paragraphs.length; paragraphIndex++) {
+        var paragraph = paragraphs[paragraphIndex];
+        if (paragraphIndex > 0) {
+            var previousParagraph = paragraphs[paragraphIndex - 1];
+            var gap = (typeof paragraph.pIdx === 'number' && typeof previousParagraph.pIdx === 'number')
+                ? Math.max(1, paragraph.pIdx - previousParagraph.pIdx)
+                : 1;
+            output += '\n'.repeat(gap);
+        }
+        output += paragraph.text;
     }
 
-    return paragraphs.join('\n');
+    return output;
 }
 
 function refreshRewriteLiveText() {
@@ -564,14 +592,15 @@ router.register('rewrite', function() {
 
     document.getElementById('rewriteBtn').addEventListener('click', async function(e) {
         e.preventDefault();
-        if (!auth.isLoggedIn()) { utils.showToast('请先登录', 'error'); auth.showAuthModal(); return; }
+        const rewriteMode = await getRewriteMode();
+        if (!rewriteMode.localTestMode && !auth.isLoggedIn()) { utils.showToast('请先登录', 'error'); auth.showAuthModal(); return; }
         if (rewriteState.isProcessing) return;
 
         const originalText = originalTextEl.value.trim();
         if (originalText.length < 25) { utils.showToast('文本长度至少25字', 'error'); return; }
 
         const requiredCredits = Math.ceil(originalText.length / 1000 * CONFIG.REWRITE_CREDITS_PER_1000);
-        if (auth.getCredits() < requiredCredits) {
+        if (!rewriteMode.localTestMode && auth.getCredits() < requiredCredits) {
             if (confirm(`积分不足\n当前：${auth.getCredits()} 积分，需要：${requiredCredits} 积分\n\n是否前往充值积分？`)) {
                 try { localStorage.setItem('ordersDefaultTab', 'recharge'); } catch (e) {}
                 router.navigate('orders');
@@ -606,7 +635,7 @@ router.register('rewrite', function() {
             rewriteState.progressLabel = formatProgressLabel(100, true);
             syncRewriteView();
             utils.showToast('降重完成', 'success');
-            await auth.refreshUserInfo();
+            if (!rewriteMode.localTestMode) await auth.refreshUserInfo();
         } catch (error) {
             if (error.name === 'AbortError') {
                 utils.showToast('已取消降重', 'info');

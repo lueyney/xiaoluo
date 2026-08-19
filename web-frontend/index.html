@@ -13,17 +13,17 @@
     <meta property="og:type" content="website">
     <meta property="og:locale" content="zh_CN">
     <meta property="og:site_name" content="小珞AI">
-    <meta property="og:title" content="小珞AI官网 - AI论文写作与降重助手">
+    <meta property="og:title" content="小珞AI工作台 - AI论文写作与降重助手">
     <meta property="og:description" content="支持AI论文写作、开题报告、文献综述、任务书、答辩稿生成，以及文本和Word文档降重。">
     <meta property="og:url" content="https://yaoguangxiaoluo.cn/">
-    <meta property="og:image" content="https://yaoguangxiaoluo.cn/assets/app-logo.png">
-    <title>小珞AI官网 - AI论文写作与降重助手</title>
+    <meta property="og:image" content="https://yaoguangxiaoluo.cn/assets/app-logo-v6.png">
+    <title>小珞AI工作台 - AI论文写作与降重助手</title>
     
     <!-- Favicon -->
-    <link rel="icon" type="image/svg+xml" href="/assets/xiaoluo-mark.svg">
+    <link rel="icon" type="image/png" href="/assets/app-logo-v6.png">
+    <link rel="icon" type="image/png" sizes="48x48" href="/favicon-48.png">
     <link rel="icon" href="/favicon.ico" sizes="any">
     <link rel="shortcut icon" href="/favicon.ico">
-    <link rel="icon" type="image/png" sizes="48x48" href="/favicon-48.png">
     <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
     <link rel="manifest" href="/site.webmanifest">
 
@@ -37,7 +37,7 @@
           "name": "小珞AI",
           "alternateName": ["AI小珞", "小珞"],
           "url": "https://yaoguangxiaoluo.cn/",
-          "logo": "https://yaoguangxiaoluo.cn/assets/xiaoluo-mark.svg"
+          "logo": "https://yaoguangxiaoluo.cn/assets/app-logo-v6.png"
         },
         {
           "@type": "WebSite",
@@ -72,16 +72,15 @@
     <nav class="navbar" id="navbar">
         <div class="container">
             <button class="nav-brand" id="brandButton" type="button" aria-label="返回起始页">
-                <img src="assets/xiaoluo-mark.svg" alt="AI小珞" style="width:34px;height:34px;border-radius:10px;margin-right:9px;">
+                <img src="assets/app-logo-v6.png" alt="AI小珞角色头像" width="34" height="34">
                 <span>AI小珞</span>
             </button>
             <div class="nav-menu" id="navMenu">
-                <a href="/" class="nav-link active" data-page="home">首页</a>
-                <a href="/ai-writing/" class="nav-link" data-page="writing">AI写作</a>
+                <a href="#writing" class="nav-link active" data-page="writing">首页</a>
                 <a href="#library" class="nav-link" data-page="library" data-auth-only>文档库</a>
-                <a href="/paper-rewrite/" class="nav-link" data-page="rewrite">AI降重</a>
-                <a href="/document-rewrite/" class="nav-link" data-page="document-rewrite">文档降重</a>
-                <a href="/pricing/" class="nav-link" data-page="orders">积分/订单</a>
+                <a href="#rewrite" class="nav-link" data-page="rewrite">AI降重</a>
+                <a href="#document-rewrite" class="nav-link" data-page="document-rewrite">文档降重</a>
+                <a href="#orders" class="nav-link" data-page="orders">积分/订单</a>
             </div>
             <div class="nav-actions">
                 <button class="theme-toggle" id="themeToggle" type="button" aria-label="切换主题" title="切换到亮色模式">
@@ -137,7 +136,7 @@
             </button>
             <aside class="auth-brand-panel" aria-hidden="true">
                 <div class="auth-brand-signature">
-                    <img class="auth-brand-logo" src="assets/xiaoluo-mark.svg" alt="">
+                    <img class="auth-brand-logo" src="assets/app-logo-v6.png" alt="">
                     <div class="auth-brand-name"><strong>AI小珞</strong><span>学术写作工作台</span></div>
                 </div>
             </aside>
@@ -188,10 +187,9 @@
     <script src="js/api.js"></script>
     <script src="js/auth.js"></script>
     <script src="js/router.js"></script>
-    <script src="js/pages/home.js"></script>
     <script src="js/pages/writing.js"></script>
     <script src="js/pages/library.js"></script>
-    <script src="js/pages/rewrite.js?v=20260815-credit-rate"></script>
+    <script src="js/pages/rewrite.js?v=20260819-local-test-mode"></script>
     <script src="js/pages/document-rewrite.js?v=20260813-rate-limit-backoff"></script>
     <script src="js/pages/orders.js"></script>
     <script src="js/pages/jianli.js"></script>
