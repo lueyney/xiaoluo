@@ -61,10 +61,20 @@ function cleanGeneratedTitle(content) {
     .slice(0, 80);
 }
 
+function cleanDirectDocumentContent(content) {
+  return String(content || '')
+    .replace(/^\uFEFF/, '')
+    .replace(/^```(?:markdown|md|text)?\s*\r?\n?/i, '')
+    .replace(/\r?\n?```\s*$/i, '')
+    .replace(/\*/g, '')
+    .trim();
+}
+
 module.exports = {
   clamp,
   countWords,
   createTraceId,
+  cleanDirectDocumentContent,
   cleanGeneratedTitle,
   extractJson,
   parseTargetWords,
