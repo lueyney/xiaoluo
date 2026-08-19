@@ -225,6 +225,12 @@ body.light-theme #rewriteVersionTabs button:focus-visible { outline:3px solid va
 body.light-theme .rewrite-rate-note { color:#64748b; background:#fffbeb; border-color:#fde68a; }
 body.light-theme .rewrite-rate-note i,
 body.light-theme .rewrite-rate-note strong { color:#b45309; }
+body.light-theme .rewrite-ai-commitment { color:#475569; background:linear-gradient(135deg,#f5f7ff,#faf8ff); border-color:#c7d2fe; }
+body.light-theme .rewrite-ai-commitment-icon { color:#4f46e5; background:#e0e7ff; }
+body.light-theme .rewrite-ai-commitment h3 { color:#273252; }
+body.light-theme .rewrite-ai-commitment-promise { color:#166534; background:#f0fdf4; border-color:#bbf7d0; }
+body.light-theme .rewrite-ai-commitment-promise strong { color:#15803d; }
+body.light-theme .rewrite-ai-commitment-terms { color:#64748b; }
 
 body.light-theme .lib-page { background:#f4f7fc !important; }
 body.light-theme .lib-header-title { color:#172554 !important; background:none !important; -webkit-text-fill-color:currentColor !important; }
