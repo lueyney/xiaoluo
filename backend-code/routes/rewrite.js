@@ -12,10 +12,9 @@ const {
   normalizeRewriteVersion
 } = require('../services/rewrite-prompts');
 const {
-  applyDeepSeekReasoning,
-  logDeepSeekSelection,
-  resolveDeepSeekCall
+  logDeepSeekSelection
 } = require('../services/ai-model-router');
+const { getRewriteConfig, buildRewritePayload } = require('../services/rewrite-config');
 const { groupRewriteTasks, buildChainedRewriteContext } = require('../services/rewrite-groups');
 
 const router = express.Router();
@@ -23,9 +22,18 @@ const LOCAL_REWRITE_TEST_MODE = process.env.NODE_ENV !== 'production'
   && process.env.LOCAL_REWRITE_TEST_MODE === 'true';
 
 router.get('/mode', (req, res) => {
+  const rewriteConfig = getRewriteConfig();
   res.json({
     code: 'SUCCESS',
-    data: { localTestMode: LOCAL_REWRITE_TEST_MODE }
+    data: {
+      localTestMode: LOCAL_REWRITE_TEST_MODE,
+      rewriteConfig: {
+        model: rewriteConfig.model,
+        temperature: rewriteConfig.temperature,
+        thinking: rewriteConfig.selection.thinking,
+        reasoningEffort: rewriteConfig.selection.reasoningEffort || 'provider-default'
+      }
+    }
   });
 });
 
@@ -123,23 +131,16 @@ async function rewriteWithDeepSeek(text, onDelta, rewriteVersion = 'v1', options
   try {
     const apiKey = process.env.DEEPSEEK_API_KEY;
     const baseURL = (process.env.DEEPSEEK_API_BASE || 'https://api.deepseek.com').replace(/\/+$/, '');
-    const selection = resolveDeepSeekCall('rewrite', {
-      model: options.model,
-      reasoningEffort: options.reasoningEffort,
-      thinking: options.thinking
-    });
+    const selection = getRewriteConfig().selection;
     if (!apiKey) throw createDeepSeekError('AI降重服务未配置', { retryable: false, code: 'AI_NOT_CONFIGURED' });
     logDeepSeekSelection(logger, selection, { caller: 'rewriteWithDeepSeek' });
 
     let response;
     try {
-      const requestPayload = applyDeepSeekReasoning({
-        model: selection.model,
+      const requestPayload = buildRewritePayload({
         messages: buildRewriteMessages(text, options.context),
-        temperature: Number(process.env.DEEPSEEK_REWRITE_TEMPERATURE || process.env.DEEPSEEK_TEMPERATURE || 0.7),
-        max_tokens: Number(process.env.DEEPSEEK_REWRITE_MAX_TOKENS || process.env.DEEPSEEK_MAX_TOKENS || 8192),
         stream: true
-      }, selection);
+      });
       response = await fetch(baseURL + '/chat/completions', {
         method: 'POST',
         headers: {
@@ -239,18 +240,15 @@ async function rewriteWithDeepSeekFallback(text, rewriteVersion = 'v1', context 
   try {
     const apiKey = process.env.DEEPSEEK_API_KEY;
     const baseURL = (process.env.DEEPSEEK_API_BASE || 'https://api.deepseek.com').replace(/\/+$/, '');
-    const selection = resolveDeepSeekCall('rewriteFallback');
+    const selection = getRewriteConfig().selection;
     if (!apiKey) throw createDeepSeekError('AI降重服务未配置', { retryable: false, code: 'AI_NOT_CONFIGURED' });
     logDeepSeekSelection(logger, selection, { caller: 'rewriteWithDeepSeekFallback' });
     let response;
     try {
-      const requestPayload = applyDeepSeekReasoning({
-        model: selection.model,
+      const requestPayload = buildRewritePayload({
         messages: buildRewriteMessages(text, context),
-        temperature: Number(process.env.DEEPSEEK_REWRITE_TEMPERATURE || process.env.DEEPSEEK_TEMPERATURE || 0.7),
-        max_tokens: Number(process.env.DEEPSEEK_REWRITE_MAX_TOKENS || process.env.DEEPSEEK_MAX_TOKENS || 8192),
         stream: false
-      }, selection);
+      });
       response = await fetch(baseURL + '/chat/completions', {
         method: 'POST',
         headers: {
@@ -435,7 +433,7 @@ async function rewriteSentences(sentences, {
     });
   }
   logger.info('AI降重任务拆分完成', {
-    model: process.env.DEEPSEEK_MODEL || 'deepseek-v4-pro',
+    model: getRewriteConfig().model,
     rewriteVersion,
     requestMode: 'one-sentence-per-request',
     sentenceUnits: sentences.length,

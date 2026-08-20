@@ -40,7 +40,7 @@ npm install
 
 1. 复制环境配置文件：
 ```bash
-cp env.example .env
+cp .env.example .env
 ```
 
 2. 编辑 `.env` 文件，配置数据库连接信息：

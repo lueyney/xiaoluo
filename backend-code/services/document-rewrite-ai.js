@@ -8,11 +8,8 @@
 
 const logger = require('../utils/logger');
 const { buildRewriteMessages, buildRewritePrompt, normalizeRewriteVersion } = require('./rewrite-prompts');
-const {
-  applyDeepSeekReasoning,
-  logDeepSeekSelection,
-  resolveDeepSeekCall
-} = require('./ai-model-router');
+const { logDeepSeekSelection } = require('./ai-model-router');
+const { buildRewritePayload, getRewriteConfig } = require('./rewrite-config');
 
 function extractMessageContent(payload) {
   const content = payload && payload.choices && payload.choices[0] && payload.choices[0].message
@@ -25,21 +22,15 @@ function extractMessageContent(payload) {
 async function rewriteDocumentSentence(text, context = {}) {
   const apiKey = process.env.DEEPSEEK_API_KEY;
   if (!apiKey) throw new Error('AI降重服务未配置');
-  const baseURL = (process.env.DEEPSEEK_API_BASE || 'https://api.deepseek.com').replace(/\/+$/, '');
-  const selection = resolveDeepSeekCall('documentRewrite', {
-    model: context.model,
-    reasoningEffort: context.reasoningEffort,
-    thinking: context.thinking
-  });
+  const config = getRewriteConfig();
+  const baseURL = config.apiBase;
+  const selection = config.selection;
   const rewriteVersion = normalizeRewriteVersion(context.rewriteVersion);
   logDeepSeekSelection(logger, selection, { caller: 'rewriteDocumentSentence', traceId: context.traceId });
-  const requestPayload = applyDeepSeekReasoning({
-    model: selection.model,
+  const requestPayload = buildRewritePayload({
     messages: buildRewriteMessages(text, context),
-    temperature: Number(process.env.DEEPSEEK_DOCUMENT_REWRITE_TEMPERATURE || process.env.DEEPSEEK_REWRITE_TEMPERATURE || process.env.DEEPSEEK_TEMPERATURE || 0.7),
-    max_tokens: Number(process.env.DEEPSEEK_DOCUMENT_REWRITE_MAX_TOKENS || process.env.DEEPSEEK_REWRITE_MAX_TOKENS || process.env.DEEPSEEK_MAX_TOKENS || 8192),
     stream: false
-  }, selection);
+  });
   const response = await fetch(baseURL + '/chat/completions', {
     method: 'POST',
     headers: {
