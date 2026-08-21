@@ -375,21 +375,15 @@
             if (isAiRewrite) {
                 downloadUrl = '/api/document-export/rewrite-docx/' + encodeURIComponent(id);
             } else {
-                var res = await api.exportDocumentWord(id);
-                downloadUrl = (res.data && res.data.downloadUrl) ? res.data.downloadUrl : null;
-                if (!downloadUrl) throw new Error('\u672a\u83b7\u53d6\u5230\u4e0b\u8f7d\u94fe\u63a5');
+                downloadUrl = '/api/document-export/document/' + encodeURIComponent(id) + '.docx';
             }
-            var baseOrigin = CONFIG.API_BASE_URL.replace('/api', '');
-            var fullUrl = downloadUrl.startsWith('http') ? downloadUrl : baseOrigin + downloadUrl;
             utils.showLoading('\u6b63\u5728\u4e0b\u8f7d...');
-            var token = localStorage.getItem('auth_token');
-            var fetchRes = await fetch(fullUrl, { method: 'GET', headers: token ? { 'Authorization': 'Bearer ' + token } : {} });
-            if (!fetchRes.ok) throw new Error('\u4e0b\u8f7d\u5931\u8d25\uff0c\u670d\u52a1\u5668\u8fd4\u56de ' + fetchRes.status);
-            var blob = await fetchRes.blob();
+            var blob = await api.downloadDocumentBlob(downloadUrl);
             utils.hideLoading();
             var blobUrl = URL.createObjectURL(blob);
             var a = document.createElement('a');
-            a.href = blobUrl; a.download = title + '.docx'; a.style.display = 'none';
+            var fileTitle = String(title || '\u6587\u6863').replace(/[<>:"/\\|?*\x00-\x1f]/g, '_');
+            a.href = blobUrl; a.download = /\.docx$/i.test(fileTitle) ? fileTitle : fileTitle + '.docx'; a.style.display = 'none';
             document.body.appendChild(a); a.click(); document.body.removeChild(a);
             setTimeout(function() { URL.revokeObjectURL(blobUrl); }, 10000);
             utils.showToast('Word \u6587\u6863\u4e0b\u8f7d\u6210\u529f', 'success');

@@ -26,29 +26,29 @@ function buildOrdersUI() {
     var mc = document.getElementById('mainContent');
     mc.innerHTML =
         '<div class="orders-page" style="min-height:100vh;background:#080b14;position:relative;overflow:hidden;padding-bottom:80px;">'
-        + '<div class="orders-bg" style="position:fixed;inset:0;z-index:0;pointer-events:none;background:radial-gradient(ellipse 80% 60% at 20% 10%,rgba(99,102,241,.12) 0%,transparent 60%),radial-gradient(ellipse 60% 50% at 80% 80%,rgba(139,92,246,.08) 0%,transparent 55%)"></div>'
-        + '<div class="orders-orb" style="position:fixed;width:460px;height:460px;border-radius:50%;filter:blur(80px);pointer-events:none;z-index:0;top:-80px;right:-60px;background:radial-gradient(circle,rgba(99,102,241,.12),transparent 70%);"></div>'
+        + '<div class="orders-bg" style="position:fixed;inset:0;z-index:0;pointer-events:none;background:radial-gradient(ellipse 80% 60% at 20% 10%,rgba(105,210,231,.10) 0%,transparent 60%),radial-gradient(ellipse 60% 50% at 80% 80%,rgba(167,219,216,.07) 0%,transparent 55%)"></div>'
+        + '<div class="orders-orb" style="position:fixed;width:460px;height:460px;border-radius:50%;filter:blur(80px);pointer-events:none;z-index:0;top:-80px;right:-60px;background:radial-gradient(circle,rgba(105,210,231,.10),transparent 70%);"></div>'
         + '<style>'
         + '.otab{padding:9px 22px;border-radius:22px;border:none;font-size:13px;font-weight:600;cursor:pointer;transition:all .2s;}'
-        + '.otab.on{background:linear-gradient(135deg,#6366f1,#8b5cf6);color:#fff;box-shadow:0 4px 14px rgba(99,102,241,.4);}'
+        + '.otab.on{background:#69d2e7;color:#112b46;box-shadow:0 4px 14px rgba(31,111,126,.28);}'
         + '.otab:not(.on){background:rgba(255,255,255,.05);color:rgba(255,255,255,.45);border:1.5px solid rgba(255,255,255,.08);}'
-        + '.otab:not(.on):hover{background:rgba(99,102,241,.12);color:#a5b4fc;border-color:rgba(99,102,241,.3);}'
+        + '.otab:not(.on):hover{background:rgba(105,210,231,.10);color:#69d2e7;border-color:rgba(105,210,231,.30);}'
         + '.pkg-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:20px;margin-bottom:28px;}'
         + '@media(max-width:900px){.pkg-grid{grid-template-columns:repeat(2,1fr);}}'
         + '@media(max-width:560px){.pkg-grid{grid-template-columns:1fr;}}'
         + '.pkgcard{background:rgba(255,255,255,.03);border-radius:20px;padding:28px 22px 22px;border:1.5px solid rgba(255,255,255,.08);cursor:default;transition:all .28s;box-shadow:0 4px 24px rgba(0,0,0,.3);position:relative;overflow:hidden;backdrop-filter:blur(12px);display:flex;flex-direction:column;}'
-        + '.pkgcard:hover{border-color:rgba(99,102,241,.4);transform:translateY(-5px);box-shadow:0 18px 44px rgba(99,102,241,.18);background:rgba(99,102,241,.06);}'
-        + '.pkgcard.popular{border-color:rgba(99,102,241,.5);background:linear-gradient(145deg,rgba(99,102,241,.11),rgba(139,92,246,.07));box-shadow:0 8px 36px rgba(99,102,241,.22);}'
+        + '.pkgcard:hover{border-color:rgba(105,210,231,.4);transform:translateY(-5px);box-shadow:0 18px 44px rgba(31,111,126,.16);background:rgba(105,210,231,.05);}'
+        + '.pkgcard.popular{border-color:rgba(105,210,231,.5);background:linear-gradient(145deg,rgba(105,210,231,.10),rgba(167,219,216,.06));box-shadow:0 8px 36px rgba(31,111,126,.18);}'
         + '.pkgcard.free-card{border-color:rgba(16,185,129,.3);background:linear-gradient(145deg,rgba(16,185,129,.07),rgba(5,150,105,.04));}'
         + '.pkgcard.free-card:hover{border-color:rgba(16,185,129,.5);box-shadow:0 18px 44px rgba(16,185,129,.14);background:rgba(16,185,129,.07);}'
         + '.pkgcard.used{opacity:0.5;pointer-events:none;}'
         + '.pkg-tag{position:absolute;top:14px;right:14px;font-size:10px;font-weight:700;padding:3px 10px;border-radius:20px;}'
-        + '.pkg-tag.hot{background:linear-gradient(135deg,#6366f1,#8b5cf6);color:#fff;}'
+        + '.pkg-tag.hot{background:#69d2e7;color:#112b46;}'
         + '.pkg-tag.free{background:linear-gradient(135deg,#10b981,#059669);color:#fff;left:14px;right:auto;}'
         + '.pkg-icon{font-size:30px;margin-bottom:10px;}'
         + '.pkg-name{font-size:16px;font-weight:700;color:#f0f4ff;margin-bottom:12px;}'
         + '.pkg-credits-row{display:flex;align-items:baseline;gap:4px;margin-bottom:6px;}'
-        + '.pkg-credits-num{font-size:42px;font-weight:900;color:#a5b4fc;letter-spacing:-2px;line-height:1;}'
+        + '.pkg-credits-num{font-size:42px;font-weight:900;color:#69d2e7;letter-spacing:-2px;line-height:1;}'
         + '.pkg-credits-label{font-size:13px;color:rgba(255,255,255,.4);font-weight:500;}'
         + '.pkg-desc{font-size:12px;color:rgba(255,255,255,.32);margin-bottom:18px;flex:1;}'
         + '.pkg-divider{height:1px;background:rgba(255,255,255,.07);margin-bottom:16px;}'
@@ -57,8 +57,8 @@ function buildOrdersUI() {
         + '.pkg-price.paid{color:#f0f4ff;}'
         + '.pkg-price.gratis{color:#10b981;font-size:16px;}'
         + '.pkg-buy-btn{padding:9px 20px;border-radius:12px;font-size:14px;font-weight:700;border:none;cursor:pointer;transition:all .2s;white-space:nowrap;}'
-        + '.pkg-buy-btn.primary{background:linear-gradient(135deg,#6366f1,#8b5cf6);color:#fff;}'
-        + '.pkg-buy-btn.primary:hover{opacity:.88;transform:translateY(-1px);box-shadow:0 6px 18px rgba(99,102,241,.4);}'
+        + '.pkg-buy-btn.primary{background:#69d2e7;color:#112b46;}'
+        + '.pkg-buy-btn.primary:hover{background:#5bc7dc;transform:translateY(-1px);box-shadow:0 6px 18px rgba(31,111,126,.28);}'
         + '.pkg-buy-btn.green{background:linear-gradient(135deg,#10b981,#059669);color:#fff;}'
         + '.pkg-buy-btn.green:hover{opacity:.88;transform:translateY(-1px);box-shadow:0 6px 18px rgba(16,185,129,.35);}'
         + '.pkg-buy-btn.used{background:rgba(255,255,255,.07);color:rgba(255,255,255,.28);cursor:not-allowed;}'
@@ -66,8 +66,8 @@ function buildOrdersUI() {
         + '<div class="orders-wrap" style="position:relative;z-index:1;max-width:960px;margin:0 auto;padding:52px 24px 40px;">'
         + '<div class="orders-header" style="display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:32px;">'
         + '<div>'
-        + '<div class="orders-eyebrow" style="display:inline-flex;align-items:center;gap:6px;padding:4px 12px;border-radius:20px;background:rgba(99,102,241,.14);border:1px solid rgba(99,102,241,.28);font-size:10px;font-weight:700;letter-spacing:.14em;color:#a5b4fc;margin-bottom:10px;"><span style="width:5px;height:5px;border-radius:50%;background:#818cf8;box-shadow:0 0 7px #818cf8;"></span>订单中心</div>'
-        + '<h1 class="orders-title" style="font-size:34px;font-weight:800;margin:0 0 6px;letter-spacing:-.8px;background:linear-gradient(135deg,#fff 30%,#a5b4fc 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;">积分与订单</h1>'
+        + '<div class="orders-eyebrow" style="display:inline-flex;align-items:center;gap:6px;padding:4px 12px;border-radius:20px;background:rgba(105,210,231,.12);border:1px solid rgba(105,210,231,.26);font-size:10px;font-weight:700;letter-spacing:.14em;color:#69d2e7;margin-bottom:10px;"><span style="width:5px;height:5px;border-radius:50%;background:#69d2e7;box-shadow:0 0 7px rgba(105,210,231,.7);"></span>订单中心</div>'
+        + '<h1 class="orders-title" style="font-size:34px;font-weight:800;margin:0 0 6px;letter-spacing:-.8px;color:#f2fbfd;">积分与订单</h1>'
         + '<p class="orders-subtitle" style="font-size:14px;color:rgba(255,255,255,.3);margin:0;">查看消费记录，购买与管理积分</p>'
         + '</div>'
         + '<div class="orders-credits" style="display:flex;align-items:center;gap:7px;padding:9px 18px;border-radius:50px;background:rgba(251,191,36,.10);border:1px solid rgba(251,191,36,.2);font-size:16px;font-weight:800;color:#fbbf24;white-space:nowrap;">'
@@ -100,7 +100,7 @@ async function loadOrders() {
         if (!auth.isLoggedIn()) {
             var guestDiv = document.getElementById('oOrders');
             if (guestDiv) {
-                guestDiv.innerHTML = '<div class="orders-empty" style="text-align:center;padding:70px 20px;"><div style="font-size:48px;margin-bottom:16px;">🧭</div><button class="orders-primary-btn" onclick="auth.showAuthModal()" style="padding:10px 22px;border-radius:10px;background:linear-gradient(135deg,#6366f1,#8b5cf6);border:none;color:#fff;font-size:14px;font-weight:600;cursor:pointer;">立即登录</button></div>';
+                guestDiv.innerHTML = '<div class="orders-empty" style="text-align:center;padding:70px 20px;"><div style="font-size:48px;margin-bottom:16px;">🧭</div><button class="orders-primary-btn" onclick="auth.showAuthModal()">立即登录</button></div>';
             }
             return;
         }
@@ -144,7 +144,7 @@ async function loadOrders() {
                 rightHtml = '<div class="order-points-pending" style="font-size:14px;font-weight:700;color:rgba(255,255,255,.5);">待到账</div><div class="order-points-label" style="font-size:11px;color:rgba(255,255,255,.3);">积分</div>';
             } else {
                 var sign = rechargeDone ? '+' : '-';
-                var col = rechargeDone ? '#34d399' : '#a5b4fc';
+                var col = rechargeDone ? '#34d399' : '#69d2e7';
                 rightHtml = '<div class="order-points-value' + (rechargeDone ? ' is-positive' : '') + '" style="font-size:22px;font-weight:800;color:' + col + ';">' + sign + cv + '</div><div class="order-points-label" style="font-size:11px;color:rgba(255,255,255,.3);">积分</div>';
             }
             return '<div class="order-card" style="background:rgba(255,255,255,.03);border-radius:14px;padding:18px 22px;margin-bottom:10px;border:1px solid rgba(255,255,255,.07);display:flex;justify-content:space-between;align-items:center;">'
@@ -163,7 +163,7 @@ async function loadPackages() {
     if (!div) return;
     try {
         if (!auth.isLoggedIn()) {
-            div.innerHTML = '<div class="orders-empty" style="text-align:center;padding:60px 20px;"><div style="font-size:44px;margin-bottom:12px;">💳</div><p class="orders-empty-text" style="color:rgba(255,255,255,.35);margin-bottom:18px;">登录后可充值并查看积分到账记录</p><button class="orders-primary-btn" onclick="auth.showAuthModal()" style="padding:10px 22px;border-radius:10px;background:linear-gradient(135deg,#6366f1,#8b5cf6);border:none;color:#fff;font-size:14px;font-weight:600;cursor:pointer;">立即登录</button></div>';
+            div.innerHTML = '<div class="orders-empty" style="text-align:center;padding:60px 20px;"><div style="font-size:44px;margin-bottom:12px;">💳</div><p class="orders-empty-text" style="color:rgba(255,255,255,.35);margin-bottom:18px;">登录后可充值并查看积分到账记录</p><button class="orders-primary-btn" onclick="auth.showAuthModal()">立即登录</button></div>';
             return;
         }
         var res = await api.get('/orders/packages');
@@ -196,12 +196,12 @@ async function loadPackages() {
         } catch(e3) {}
         window.__inviteCode = inviteCode;
         var inviteBtnText = claimableCount > 0 ? '立即领取' : '立即邀请';
-        var inviteBtnBg = claimableCount > 0 ? 'linear-gradient(135deg,#10b981,#059669)' : 'linear-gradient(135deg,#6366f1,#8b5cf6)';
+        var inviteBtnBg = claimableCount > 0 ? 'linear-gradient(135deg,#10b981,#059669)' : '#69d2e7';
         var inviteCard = '<div class="pkgcard free-card">'
             + '<div class="pkg-tag free">邀请福利</div>'
             + '<div class="pkg-icon">🎁</div>'
-            + '<div class="pkg-name">邀请好友再得30积分</div>'
-            + '<div class="pkg-credits-row"><span class="pkg-credits-num">30</span><span class="pkg-credits-label">积分</span></div>'
+            + '<div class="pkg-name">邀请好友再得20积分</div>'
+            + '<div class="pkg-credits-row"><span class="pkg-credits-num">20</span><span class="pkg-credits-label">积分</span></div>'
             + '<div class="pkg-desc">好友填写你的邀请码后才可领取。未达成时可先邀请好友，达成后按钮自动变“立即领取”。</div>'
             + '<div class="pkg-divider"></div>'
             + '<div class="pkg-footer"><span class="pkg-price gratis">邀请专享</span>'
@@ -252,7 +252,7 @@ async function loadPackages() {
             + '<div>📝 学术论文 120分</div><div>📄 开题报告 40分</div>'
             + '<div>📚 文献综述 20分</div><div>🔧 任务书 25分</div>'
             + '<div>🎤 答辩稿 10分</div><div>📋 中期检查 10分</div>'
-            + '<div class="orders-info-accent" style="grid-column:1/-1;padding-top:8px;border-top:1px solid rgba(255,255,255,.06);color:#a5b4fc;font-weight:600;">AI降重 180积分/1万字（约18积分/千字）</div>'
+            + '<div class="orders-info-accent" style="grid-column:1/-1;padding-top:8px;border-top:1px solid rgba(255,255,255,.06);color:#69d2e7;font-weight:600;">AI降重 180积分/1万字（约18积分/千字）</div>'
             + '</div></div>';
     } catch(e) {
         div.innerHTML = '<p style="color:#f87171;text-align:center;padding:40px;">' + (e.message || '\u52a0\u8f7d\u5931\u8d25') + '</p>';
@@ -283,15 +283,15 @@ window.showInviteCodeModal = function(inviteCode) {
     var modal = document.createElement('div');
     modal.id = 'inviteCodeModal';
     modal.style.cssText = 'position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,.78);display:flex;align-items:center;justify-content:center;backdrop-filter:blur(4px);';
-    modal.innerHTML = '<div style="background:#0f1221;border:1px solid rgba(99,102,241,.4);border-radius:20px;padding:28px 24px;text-align:center;max-width:360px;width:92%;position:relative;box-shadow:0 24px 60px rgba(0,0,0,.6);">'
+    modal.innerHTML = '<div style="background:#0d1d29;border:1px solid rgba(105,210,231,.34);border-radius:20px;padding:28px 24px;text-align:center;max-width:360px;width:92%;position:relative;box-shadow:0 24px 60px rgba(0,0,0,.6);">'
         + '<button onclick="closeInviteCodeModal()" style="position:absolute;top:12px;right:14px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);color:rgba(255,255,255,.5);font-size:16px;cursor:pointer;width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;line-height:1;">✕</button>'
-        + '<div style="font-size:20px;font-weight:800;color:#f0f4ff;margin-bottom:8px;">邀请好友再得30分</div>'
-        + '<p style="font-size:13px;color:rgba(226,232,240,.75);line-height:1.75;margin:0 0 14px;">把邀请码发给好友，好友在“我的页面”填写后，你回到订单页面点击“立即领取”，即可到账30积分。</p>'
-        + '<div style="padding:12px;border-radius:12px;background:rgba(99,102,241,.12);border:1px solid rgba(99,102,241,.35);margin-bottom:12px;">'
+        + '<div style="font-size:20px;font-weight:800;color:#f0f8fa;margin-bottom:8px;">邀请好友再得20分</div>'
+        + '<p style="font-size:13px;color:rgba(226,240,242,.75);line-height:1.75;margin:0 0 14px;">把邀请码发给好友，好友在“我的页面”填写后，你回到订单页面点击“立即领取”，即可到账20积分。</p>'
+        + '<div style="padding:12px;border-radius:12px;background:rgba(105,210,231,.10);border:1px solid rgba(105,210,231,.30);margin-bottom:12px;">'
         + '<div style="font-size:12px;color:rgba(255,255,255,.45);margin-bottom:4px;">我的邀请码</div>'
-        + '<div id="inviteCodeText" style="font-size:22px;font-weight:800;color:#c4b5fd;letter-spacing:.08em;">' + inviteCode + '</div>'
+        + '<div id="inviteCodeText" style="font-size:22px;font-weight:800;color:#69d2e7;letter-spacing:.08em;">' + inviteCode + '</div>'
         + '</div>'
-        + '<button onclick="copyInviteCode()" style="padding:10px 16px;border-radius:10px;border:none;background:linear-gradient(135deg,#6366f1,#8b5cf6);color:#fff;font-size:13px;font-weight:700;cursor:pointer;">复制邀请码</button>'
+        + '<button class="orders-primary-btn" onclick="copyInviteCode()">复制邀请码</button>'
         + '</div>';
     document.body.appendChild(modal);
     modal.addEventListener('click', function(e) { if (e.target === modal) closeInviteCodeModal(); });
@@ -430,13 +430,13 @@ function showPayQrModal(orderId, name, credits, price, codeUrl) {
     var modal = document.createElement('div');
     modal.id = 'payQrModal';
     modal.style.cssText = 'position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,.78);display:flex;align-items:center;justify-content:center;backdrop-filter:blur(4px);';
-    modal.innerHTML = '<div style="background:#0f1221;border:1px solid rgba(99,102,241,.4);border-radius:24px;padding:36px 32px 28px;text-align:center;max-width:320px;width:90%;position:relative;box-shadow:0 24px 60px rgba(0,0,0,.6);">'
+    modal.innerHTML = '<div style="background:#0d1d29;border:1px solid rgba(105,210,231,.34);border-radius:24px;padding:36px 32px 28px;text-align:center;max-width:320px;width:90%;position:relative;box-shadow:0 24px 60px rgba(0,0,0,.6);">'
         + '<button onclick="closePayModal(' + orderId + ',' + credits + ')" style="position:absolute;top:14px;right:16px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);color:rgba(255,255,255,.5);font-size:16px;cursor:pointer;width:30px;height:30px;border-radius:50%;display:flex;align-items:center;justify-content:center;line-height:1;">✕</button>'
-        + '<div style="width:48px;height:48px;border-radius:50%;background:linear-gradient(135deg,#6366f1,#8b5cf6);display:flex;align-items:center;justify-content:center;margin:0 auto 14px;font-size:22px;">\ud83d\udcce</div>'
+        + '<div style="width:48px;height:48px;border-radius:50%;background:#69d2e7;color:#112b46;display:flex;align-items:center;justify-content:center;margin:0 auto 14px;font-size:22px;">\ud83d\udcce</div>'
         + '<div style="font-size:20px;font-weight:800;color:#f0f4ff;margin-bottom:4px;">' + name + '</div>'
         + '<div style="font-size:13px;color:rgba(255,255,255,.4);margin-bottom:20px;">' + credits + ' \u79ef\u5206 &nbsp;/&nbsp; <span style="color:#fbbf24;font-weight:700;">&yen;' + price + '</span></div>'
         + qrContent
-        + '<div id="payStatus" style="font-size:13px;color:#a5b4fc;margin-top:16px;padding:10px 16px;background:rgba(99,102,241,.08);border-radius:10px;border:1px solid rgba(99,102,241,.15);">\u23f3 \u7b49\u5f85\u652f\u4ed8...</div>'
+        + '<div id="payStatus" style="font-size:13px;color:#69d2e7;margin-top:16px;padding:10px 16px;background:rgba(105,210,231,.08);border-radius:10px;border:1px solid rgba(105,210,231,.18);">\u23f3 \u7b49\u5f85\u652f\u4ed8...</div>'
         + '<p style="font-size:11px;color:rgba(255,255,255,.2);margin:12px 0 0;">\u652f\u4ed8\u5b8c\u6210\u540e\u53ef\u5173\u95ed\u6b64\u7a97\u53e3\uff0c\u79ef\u5206\u5c06\u81ea\u52a8\u5230\u8d26</p>'
         + '</div>';
     document.body.appendChild(modal);
@@ -453,7 +453,7 @@ function showPayQrModal(orderId, name, credits, price, codeUrl) {
                 var s = document.createElement('script');
                 s.src = 'https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js';
                 s.onload = renderQR;
-                s.onerror = function() { qrEl.innerHTML = '<p style="color:#a5b4fc;font-size:11px;word-break:break-all;padding:8px;">' + codeUrl + '</p>'; };
+                s.onerror = function() { qrEl.innerHTML = '<p style="color:#69d2e7;font-size:11px;word-break:break-all;padding:8px;">' + codeUrl + '</p>'; };
                 document.head.appendChild(s);
             }
         }

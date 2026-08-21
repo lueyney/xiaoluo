@@ -121,7 +121,7 @@ router.register('profile', function() {
             <aside class="account-side-stack">
                 <section class="account-panel account-invite-panel">
                     <div class="account-panel-head compact">
-                        <div><h2>邀请奖励</h2><p>好友填写后，你可领取 30 积分。</p></div>
+                        <div><h2>邀请奖励</h2><p>好友填写后，你可领取 20 积分。</p></div>
                         <span class="account-reward-badge">+30</span>
                     </div>
                     <label>我的邀请码</label>

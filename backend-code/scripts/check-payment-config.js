@@ -74,11 +74,32 @@ console.log('\n========================================');
 console.log('📁 检查证书文件...\n');
 
 // 检查2: 证书文件
-const certPath = path.join(__dirname, '../certs/apiclient_key.pem');
+const certPath = process.env.WECHAT_PRIVATE_KEY_PATH
+  ? path.resolve(process.env.WECHAT_PRIVATE_KEY_PATH)
+  : path.join(__dirname, '../certs/apiclient_key.pem');
 const certExists = fs.existsSync(certPath);
+const privateKeyEnv = process.env.WECHAT_PRIVATE_KEY;
+const privateKeyBase64 = process.env.WECHAT_PRIVATE_KEY_BASE64;
+
+if (privateKeyEnv || privateKeyBase64) {
+  try {
+    const keyContent = privateKeyEnv
+      ? privateKeyEnv.replace(/\\n/g, '\n')
+      : Buffer.from(privateKeyBase64, 'base64').toString('utf8');
+    if (keyContent.includes('-----BEGIN PRIVATE KEY-----')) {
+      console.log(`✅ 商户私钥已通过 ${privateKeyEnv ? 'WECHAT_PRIVATE_KEY' : 'WECHAT_PRIVATE_KEY_BASE64'} 配置`);
+    } else {
+      console.log('❌ 环境变量中的商户私钥格式错误');
+      hasErrors = true;
+    }
+  } catch (error) {
+    console.log(`❌ 环境变量中的商户私钥无法读取: ${error.message}`);
+    hasErrors = true;
+  }
+}
 
 if (certExists) {
-  console.log('✅ 证书文件存在: backend-code/certs/apiclient_key.pem');
+    console.log(`✅ 商户私钥文件存在: ${certPath}`);
   
   // 检查文件内容
   try {
@@ -98,8 +119,12 @@ if (certExists) {
     hasErrors = true;
   }
 } else {
-  console.log('❌ 证书文件不存在: backend-code/certs/apiclient_key.pem');
-  hasErrors = true;
+  if (privateKeyEnv || privateKeyBase64) {
+    console.log('ℹ️ 未挂载证书文件，当前使用环境变量中的商户私钥');
+  } else {
+    console.log('❌ 商户私钥未配置：请设置 WECHAT_PRIVATE_KEY_PATH、WECHAT_PRIVATE_KEY、WECHAT_PRIVATE_KEY_BASE64，或挂载 backend-code/certs/apiclient_key.pem');
+    hasErrors = true;
+  }
 }
 
 // 检查辅助证书文件

@@ -288,7 +288,7 @@ Page({
 
     wx.showModal({
       title: '邀请好友',
-      content: `您的邀请码是：${inviteCode}\n\n好友填写后可得10积分，您可领取30积分邀请奖励。`,
+      content: `您的邀请码是：${inviteCode}\n\n好友填写后可得10积分，您可领取20积分邀请奖励。`,
       confirmText: '复制邀请码',
       success: (res) => {
         if (res.confirm) {

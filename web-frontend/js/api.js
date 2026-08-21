@@ -36,7 +36,10 @@ class API {
                         setTimeout(() => { if (window.auth) window.auth.showAuthModal(); }, 500);
                     }
                 }
-                throw new Error(data.error || data.message || '请求失败');
+                const requestError = new Error(data.error || data.message || '请求失败');
+                requestError.code = data.code || '';
+                requestError.status = response.status;
+                throw requestError;
             }
             return data;
         } catch (error) {
@@ -128,11 +131,27 @@ class API {
      * 直接下载文档 Word 文件（Blob）
      */
     async downloadDocumentBlob(downloadUrl) {
-        const baseOrigin = this.baseURL.replace('/api', '');
-        const fullUrl = downloadUrl.startsWith('http') ? downloadUrl : baseOrigin + downloadUrl;
-        const response = await fetch(fullUrl);
-        if (!response.ok) throw new Error('下载失败，请重试');
-        return response.blob();
+        let fullUrl = downloadUrl;
+        if (!downloadUrl.startsWith('http')) {
+            const apiOrigin = new URL(this.baseURL, window.location.origin).origin;
+            fullUrl = apiOrigin + (downloadUrl.startsWith('/') ? downloadUrl : '/' + downloadUrl);
+        }
+        const token = localStorage.getItem('auth_token');
+        const response = await fetch(fullUrl, {
+            method: 'GET',
+            headers: token ? { 'Authorization': `Bearer ${token}` } : {},
+            cache: 'no-store'
+        });
+        if (!response.ok) {
+            const payload = await response.json().catch(() => ({}));
+            throw new Error(payload.error || '下载失败，请重试');
+        }
+        const blob = await response.blob();
+        const signature = new Uint8Array(await blob.slice(0, 4).arrayBuffer());
+        if (signature.length < 2 || signature[0] !== 0x50 || signature[1] !== 0x4b) {
+            throw new Error('服务器返回的不是有效 Word 文档');
+        }
+        return blob;
     }
 
     // ==================== 降重 ====================

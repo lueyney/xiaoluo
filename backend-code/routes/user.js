@@ -202,7 +202,7 @@ router.get('/invite/status', async (req, res) => {
   }
 });
 
-// 邀请者领取奖励（每次领取一位被邀请用户，30积分）
+// 邀请者领取奖励（每次领取一位被邀请用户，20积分）
 router.post('/invite/claim', async (req, res) => {
   try {
     const userId = req.user.id;
@@ -227,10 +227,10 @@ router.post('/invite/claim', async (req, res) => {
       if (!invitedRows.length) return;
 
       const invitedUserId = invitedRows[0].id;
-      claimedCredits = 30;
+      claimedCredits = 20;
 
       await conn.execute(
-        'UPDATE user_credits SET credits = credits + 30, total_earned = total_earned + 30 WHERE user_id = ?',
+        'UPDATE user_credits SET credits = credits + 20, total_earned = total_earned + 20 WHERE user_id = ?',
         [userId]
       );
 
@@ -239,7 +239,7 @@ router.post('/invite/claim', async (req, res) => {
 
       await conn.execute(
         `INSERT INTO credit_transactions (user_id, type, amount, balance_after, source, source_id, description)
-         VALUES (?, 'earn', 30, ?, 'invite_claim', ?, '邀请好友奖励领取')`,
+         VALUES (?, 'earn', 20, ?, 'invite_claim', ?, '邀请好友奖励领取')`,
         [userId, balanceAfter, invitedUserId]
       );
     });
@@ -251,7 +251,7 @@ router.post('/invite/claim', async (req, res) => {
     res.json({
       code: 'SUCCESS',
       data: { claimedCount: 1, claimedCredits, balanceAfter },
-      message: '已领取30积分'
+      message: '已领取20积分'
     });
   } catch (error) {
     logger.error('领取邀请奖励失败:', error.message);

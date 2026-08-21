@@ -372,7 +372,16 @@ router.post('/create-web-order', [
     if (!nativeResult.success) {
       await query(`UPDATE payment_orders SET status='failed' WHERE id=?`, [orderId]);
       if (nativeResult.code === 'NO_AUTH') return res.status(503).json({ error: '当前暂不支持扫码支付，请联系管理员开通该功能', code: 'NO_AUTH' });
-      return res.status(500).json({ error: '创建支付二维码失败', code: 'WECHAT_PAY_FAILED', message: nativeResult.error });
+      if (nativeResult.code === 'PAY_CONFIG_ERROR') {
+        return res.status(503).json({ error: '支付服务配置未完成，请联系客服', code: 'PAY_CONFIG_ERROR' });
+      }
+      logger.error('[WebPay] 微信 Native 下单失败', {
+        orderId,
+        outTradeNo,
+        providerCode: nativeResult.code || null,
+        providerError: nativeResult.error || null
+      });
+      return res.status(502).json({ error: '微信支付暂时不可用，请稍后重试或联系客服', code: nativeResult.code || 'WECHAT_PAY_FAILED' });
     }
 
     return res.json({ code: 'SUCCESS', data: { orderId, outTradeNo, amount, credits, codeUrl: nativeResult.codeUrl } });

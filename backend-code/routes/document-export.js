@@ -8,7 +8,8 @@ const { body, validationResult } = require('express-validator');
 const { query } = require('../config/database');
 const { authenticateToken } = require('../middleware/auth');
 const logger = require('../utils/logger');
-const { generateAndSaveWord } = require('../utils/word-generator');
+const { generateAndSaveWord, generateWordDocx } = require('../utils/word-generator');
+const { Packer } = require('docx');
 const fs = require('fs').promises;
 const path = require('path');
 
@@ -90,6 +91,40 @@ router.post('/generate-word', [
 });
 
 /**
+ * 直接生成并返回 Word，避免容器临时文件在两次请求之间丢失。
+ */
+router.get('/document/:documentId.docx', authenticateToken, async (req, res) => {
+  try {
+    const documentId = Number(req.params.documentId);
+    if (!Number.isInteger(documentId) || documentId <= 0) {
+      return res.status(400).json({ error: '文档ID必须是整数', code: 'VALIDATION_ERROR' });
+    }
+    const rows = await query('SELECT * FROM documents WHERE id = ? AND user_id = ? AND is_deleted = 0', [documentId, req.user.id]);
+    const document = rows[0];
+    if (!document) return res.status(404).json({ error: '文档不存在', code: 'DOCUMENT_NOT_FOUND' });
+    const docx = await generateWordDocx(document);
+    const buffer = await Packer.toBuffer(docx);
+    sendDocx(res, buffer, `${safeDownloadStem(document.title)}.docx`);
+  } catch (error) {
+    logger.error('直接导出Word文档失败:', error);
+    res.status(500).json({ error: '生成文档失败', code: 'GENERATE_WORD_ERROR' });
+  }
+});
+
+function safeDownloadStem(value) {
+  return String(value || '文档').replace(/[<>:"/\\|?*\x00-\x1f]/g, '_').slice(0, 120) || '文档';
+}
+
+function sendDocx(res, buffer, fileName) {
+  const ascii = fileName.replace(/[^\x20-\x7e]/g, '_');
+  res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
+  res.setHeader('Content-Length', buffer.length);
+  res.setHeader('Content-Disposition', `attachment; filename="${ascii}"; filename*=UTF-8''${encodeURIComponent(fileName)}`);
+  res.setHeader('Cache-Control', 'no-store');
+  res.send(buffer);
+}
+
+/**
  * 下载文档库中的 AI 降重稿。
  * 该文件是上传 DOCX 原位替换文字后的副本，不能走通用的纯文本 Word 重建逻辑。
  */
@@ -105,25 +140,27 @@ router.get('/rewrite-docx/:documentId', authenticateToken, async (req, res) => {
     );
     const document = rows[0];
     if (!document) return res.status(404).json({ error: '文档不存在', code: 'DOCUMENT_NOT_FOUND' });
-    if (document.type !== 'AI降重' || !document.rewrite_docx_path) {
+    if (document.type !== 'AI降重') {
       return res.status(409).json({ error: '该文档没有可下载的原格式降重文件', code: 'REWRITE_FILE_NOT_FOUND' });
     }
 
     const backendRoot = path.resolve(__dirname, '..');
-    const filePath = path.resolve(backendRoot, document.rewrite_docx_path);
+    const filePath = document.rewrite_docx_path ? path.resolve(backendRoot, document.rewrite_docx_path) : '';
     const libraryRoot = path.resolve(backendRoot, 'data', 'document-library');
-    if (!filePath.toLowerCase().startsWith(`${libraryRoot.toLowerCase()}${path.sep}`)) {
+    if (filePath && !filePath.toLowerCase().startsWith(`${libraryRoot.toLowerCase()}${path.sep}`)) {
       return res.status(400).json({ error: '非法文件路径', code: 'INVALID_FILENAME' });
     }
-    const buffer = await fs.readFile(filePath);
-    const stem = String(document.title || '文档').replace(/[<>:"/\\|?*\x00-\x1f]/g, '_').slice(0, 120) || '文档';
+    let buffer = null;
+    if (filePath) buffer = await fs.readFile(filePath).catch((error) => error.code === 'ENOENT' ? null : Promise.reject(error));
+    if (!buffer) {
+      const fullRows = await query('SELECT * FROM documents WHERE id = ? AND user_id = ?', [documentId, req.user.id]);
+      const docx = await generateWordDocx(fullRows[0]);
+      buffer = await Packer.toBuffer(docx);
+      logger.warn(`原格式降重文件缺失，已回退为内容版 Word: document=${documentId}`);
+    }
+    const stem = safeDownloadStem(document.title);
     const fileName = `${/_降重$/u.test(stem) ? stem : `${stem}_降重`}.docx`;
-    const ascii = fileName.replace(/[^\x20-\x7e]/g, '_');
-    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
-    res.setHeader('Content-Length', buffer.length);
-    res.setHeader('Content-Disposition', `attachment; filename="${ascii}"; filename*=UTF-8''${encodeURIComponent(fileName)}`);
-    res.setHeader('Cache-Control', 'no-store');
-    res.send(buffer);
+    sendDocx(res, buffer, fileName);
   } catch (error) {
     if (error.code === 'ENOENT') return res.status(404).json({ error: '降重文件不存在', code: 'REWRITE_FILE_NOT_FOUND' });
     logger.error('下载原格式降重文档失败:', error);

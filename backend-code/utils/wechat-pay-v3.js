@@ -20,20 +20,60 @@ const WECHAT_PAY_CONFIG = {
     logger.warn('⚠️  WECHAT_NOTIFY_URL 未配置，支付回调功能将不可用');
     return '';
   })(),
-  privateKeyPath: path.join(__dirname, '../certs/apiclient_key.pem')
+  privateKeyPath: process.env.WECHAT_PRIVATE_KEY_PATH
+    ? path.resolve(process.env.WECHAT_PRIVATE_KEY_PATH)
+    : path.join(__dirname, '../certs/apiclient_key.pem')
 };
 
-// 加载商户私钥
-let privateKey = null;
-try {
-  if (fs.existsSync(WECHAT_PAY_CONFIG.privateKeyPath)) {
-    privateKey = fs.readFileSync(WECHAT_PAY_CONFIG.privateKeyPath, 'utf8');
-    logger.info('✅ 商户私钥加载成功');
-  } else {
-    logger.warn('⚠️ 商户私钥文件不存在:', WECHAT_PAY_CONFIG.privateKeyPath);
+function normalizePrivateKey(value) {
+  const key = String(value || '').trim().replace(/\\n/g, '\n');
+  return key.includes('-----BEGIN PRIVATE KEY-----') ? key : '';
+}
+
+// 云部署优先从环境变量加载，兼容平台不支持挂载私钥文件的情况。
+// WECHAT_PRIVATE_KEY_BASE64 适合不便保存多行环境变量的平台。
+let privateKey = normalizePrivateKey(process.env.WECHAT_PRIVATE_KEY);
+let privateKeySource = privateKey ? 'WECHAT_PRIVATE_KEY' : '';
+if (!privateKey && process.env.WECHAT_PRIVATE_KEY_BASE64) {
+  try {
+    privateKey = normalizePrivateKey(Buffer.from(process.env.WECHAT_PRIVATE_KEY_BASE64, 'base64').toString('utf8'));
+    if (privateKey) privateKeySource = 'WECHAT_PRIVATE_KEY_BASE64';
+  } catch (error) {
+    logger.error('❌ WECHAT_PRIVATE_KEY_BASE64 解码失败:', error.message);
   }
+}
+try {
+  if (!privateKey && fs.existsSync(WECHAT_PAY_CONFIG.privateKeyPath)) {
+    privateKey = normalizePrivateKey(fs.readFileSync(WECHAT_PAY_CONFIG.privateKeyPath, 'utf8'));
+    if (privateKey) privateKeySource = WECHAT_PAY_CONFIG.privateKeyPath;
+  }
+  if (privateKey) logger.info(`✅ 商户私钥加载成功（${privateKeySource}）`);
+  else logger.warn('⚠️ 商户私钥未配置，请设置 WECHAT_PRIVATE_KEY/WECHAT_PRIVATE_KEY_BASE64 或挂载 apiclient_key.pem');
 } catch (error) {
   logger.error('❌ 加载商户私钥失败:', error.message);
+}
+
+function validatePayConfig(options = {}) {
+  const requireApiV3Key = options.requireApiV3Key !== false;
+  const missing = [];
+  if (!WECHAT_PAY_CONFIG.appId) missing.push('WECHAT_APP_ID');
+  if (!WECHAT_PAY_CONFIG.mchId || WECHAT_PAY_CONFIG.mchId === 'your_mchid') missing.push('WECHAT_MCH_ID');
+  if (requireApiV3Key && (!WECHAT_PAY_CONFIG.apiV3Key || WECHAT_PAY_CONFIG.apiV3Key.length !== 32)) missing.push('WECHAT_APIV3_KEY');
+  if (!WECHAT_PAY_CONFIG.certSerial) missing.push('WECHAT_CERT_SERIAL');
+  if (!WECHAT_PAY_CONFIG.notifyUrl) missing.push('WECHAT_NOTIFY_URL');
+  if (!privateKey) missing.push('WECHAT_PRIVATE_KEY');
+  return { valid: missing.length === 0, missing };
+}
+
+function getPayConfigStatus() {
+  const state = validatePayConfig();
+  return {
+    valid: state.valid,
+    missing: state.missing,
+    privateKeyLoaded: Boolean(privateKey),
+    privateKeySource: privateKeySource || null,
+    notifyUrlConfigured: Boolean(WECHAT_PAY_CONFIG.notifyUrl)
+  };
 }
 
 /**
@@ -368,14 +408,20 @@ async function closeOrder(outTradeNo) {
 async function createNativeOrder(params) {
   const { outTradeNo, description, amount } = params;
 
-  if (!WECHAT_PAY_CONFIG.mchId || WECHAT_PAY_CONFIG.mchId === 'your_mchid') {
-    logger.warn('⚠️  微信支付未完整配置，返回mock模式');
-    return { mock: true };
-  }
-
-  if (!WECHAT_PAY_CONFIG.notifyUrl) {
-    logger.error('❌ WECHAT_NOTIFY_URL 未配置');
-    return { success: false, error: '支付回调地址未配置' };
+  // APIv3 密钥用于支付通知解密，不参与 Native 下单签名；二维码创建
+  // 不应因该字段暂时缺失而被提前阻断，支付回调仍会由完整状态检查告警。
+  const configState = validatePayConfig({ requireApiV3Key: false });
+  if (!configState.valid) {
+    if (process.env.NODE_ENV !== 'production' && configState.missing.includes('WECHAT_MCH_ID')) {
+      logger.warn('⚠️  微信支付未完整配置，返回mock模式');
+      return { mock: true };
+    }
+    logger.error('❌ 微信支付配置不完整:', configState.missing.join(', '));
+    return {
+      success: false,
+      code: 'PAY_CONFIG_ERROR',
+      error: `微信支付配置不完整：${configState.missing.join(', ')}`
+    };
   }
 
   if (!outTradeNo || outTradeNo.length < 6 || outTradeNo.length > 32) {
@@ -397,9 +443,7 @@ async function createNativeOrder(params) {
   const bodyStr = JSON.stringify(requestBody);
 
   try {
-    logger.info('📤 发起Native下单请求');
-    logger.info('   商户订单号:', outTradeNo);
-    logger.info('   支付金额:', amount, '分');
+    logger.info('📤 发起Native下单请求', { outTradeNo, amountFen: amount });
 
     const authorization = buildAuthorizationHeader('POST', url, bodyStr);
     const response = await axios.post(fullUrl, requestBody, {
@@ -414,10 +458,14 @@ async function createNativeOrder(params) {
     logger.info('✅ Native下单成功, code_url:', response.data.code_url);
     return { success: true, codeUrl: response.data.code_url };
   } catch (error) {
-    logger.error('❌ Native下单失败:', error.message);
+    logger.error('❌ Native下单失败', {
+      message: error.message || String(error),
+      code: error.code || null,
+      responseStatus: error.response && error.response.status || null,
+      responseData: error.response && error.response.data || null,
+      outTradeNo
+    });
     if (error.response) {
-      logger.error('   响应状态:', error.response.status);
-      logger.error('   响应数据:', error.response.data);
       const errData = error.response.data;
       // 商户未开通Native支付产品权限
       if (errData && errData.code === 'NO_AUTH') {
@@ -425,7 +473,12 @@ async function createNativeOrder(params) {
         return { success: false, error: '商户未开通扫码支付权限，请联系管理员', code: 'NO_AUTH' };
       }
     }
-    return { success: false, error: error.response?.data || error.message };
+    const responseError = error.response && error.response.data;
+    return {
+      success: false,
+      code: responseError && responseError.code || 'WECHAT_REQUEST_FAILED',
+      error: responseError || error.message
+    };
   }
 }
 
@@ -437,5 +490,7 @@ module.exports = {
   generateNotifyResponse,
   queryOrder,
   closeOrder,
-  generateNonceStr
+  generateNonceStr,
+  validatePayConfig,
+  getPayConfigStatus
 };
