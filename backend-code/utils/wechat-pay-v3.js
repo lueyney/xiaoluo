@@ -66,10 +66,15 @@ function validatePayConfig(options = {}) {
 }
 
 function getPayConfigStatus() {
-  const state = validatePayConfig();
+  const nativeState = validatePayConfig({ requireApiV3Key: false });
+  const notifyState = validatePayConfig();
   return {
-    valid: state.valid,
-    missing: state.missing,
+    valid: notifyState.valid,
+    missing: notifyState.missing,
+    nativeReady: nativeState.valid,
+    notifyReady: notifyState.valid,
+    nativeMissing: nativeState.missing,
+    notifyMissing: notifyState.missing,
     privateKeyLoaded: Boolean(privateKey),
     privateKeySource: privateKeySource || null,
     notifyUrlConfigured: Boolean(WECHAT_PAY_CONFIG.notifyUrl)

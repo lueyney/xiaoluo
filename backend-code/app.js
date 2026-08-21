@@ -30,6 +30,8 @@ const douyinAuthRoutes = require('./routes/douyin-auth');
 const douyinPayRoutes = require('./routes/douyin-pay');
 const { startCleanupJob } = require('./utils/cleanup-orders');
 const { query, transaction } = require('./config/database');
+const { getPayConfigStatus } = require('./utils/wechat-pay-v3');
+const { getReadiness } = require('./services/readiness');
 
 const app = express();
 const PORT = Number(process.env.PORT) || 3001;
@@ -296,6 +298,18 @@ app.get('/health', (req, res) => {
     timestamp: new Date().toISOString(),
     uptime: process.uptime(),
     port: PORT
+  });
+});
+
+// 只返回能力状态和缺失的配置名，不返回任何密钥、连接串或私钥来源。
+app.get('/health/readiness', async (req, res) => {
+  const status = await getReadiness({
+    query,
+    payStatus: getPayConfigStatus()
+  });
+  res.status(status.ready ? 200 : 503).json({
+    ...status,
+    timestamp: new Date().toISOString()
   });
 });
 
