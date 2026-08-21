@@ -1,0 +1,12 @@
+.env
+.env.*
+**/certs/*.pem
+**/certs/*.p12
+**/node_modules
+**/*.log
+**/logs
+**/exports
+**/tmp
+.git
+.gitignore
+npm-debug.log

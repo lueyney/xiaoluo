@@ -370,6 +370,7 @@ const server = app.listen(PORT, '0.0.0.0', async () => {
         is_first_recharge TINYINT(1) DEFAULT 0,
         status VARCHAR(20) NOT NULL DEFAULT 'pending',
         out_trade_no VARCHAR(64) DEFAULT NULL,
+        code_url VARCHAR(512) DEFAULT NULL,
         trade_no VARCHAR(64) DEFAULT NULL,
         created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
@@ -384,6 +385,7 @@ const server = app.listen(PORT, '0.0.0.0', async () => {
     const payCols = [
       { name: 'is_first_recharge', ddl: 'ALTER TABLE payment_orders ADD COLUMN is_first_recharge TINYINT(1) DEFAULT 0' },
       { name: 'out_trade_no', ddl: 'ALTER TABLE payment_orders ADD COLUMN out_trade_no VARCHAR(64) DEFAULT NULL' },
+      { name: 'code_url', ddl: 'ALTER TABLE payment_orders ADD COLUMN code_url VARCHAR(512) DEFAULT NULL' },
       { name: 'updated_at', ddl: 'ALTER TABLE payment_orders ADD COLUMN updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP' },
       { name: 'paid_at', ddl: 'ALTER TABLE payment_orders ADD COLUMN paid_at TIMESTAMP NULL DEFAULT NULL' }
     ];

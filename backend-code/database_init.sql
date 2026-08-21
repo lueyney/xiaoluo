@@ -109,6 +109,7 @@ CREATE TABLE `payment_orders` (
   `is_first_recharge` tinyint(1) DEFAULT 0 COMMENT '是否首充订单',
   `status` varchar(20) NOT NULL DEFAULT 'pending' COMMENT '状态: pending-待支付 paid-已支付 failed-失败 cancelled-取消',
   `out_trade_no` varchar(64) DEFAULT NULL COMMENT '商户订单号',
+  `code_url` varchar(512) DEFAULT NULL COMMENT 'Native支付二维码地址',
   `trade_no` varchar(64) DEFAULT NULL COMMENT '微信支付订单号',
   `created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   `updated_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',

@@ -11,6 +11,7 @@
     "test-db": "node scripts/test-connection.js",
     "check-paperfake": "node scripts/check-paperfake-config.js",
     "check-sms": "node scripts/check-sms-config.js",
+    "check-wechat-pay": "node scripts/check-payment-config.js",
     "check-ai-models": "node scripts/check-ai-models.js"
   },
   "keywords": [

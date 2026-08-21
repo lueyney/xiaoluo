@@ -26,10 +26,12 @@
 
 ```env
 # 微信支付配置
-WECHAT_APPID=你的小程序AppID
+WECHAT_APP_ID=你的小程序AppID
 WECHAT_MCH_ID=你的商户号
-WECHAT_API_KEY=你的API密钥
-WECHAT_NOTIFY_URL=https://你的域名/api/payment/wechat-notify
+WECHAT_APIV3_KEY=你的32字节APIv3密钥
+WECHAT_CERT_SERIAL=你的商户证书序列号
+WECHAT_NOTIFY_URL=https://你的域名/api/wechat-pay/notify
+WECHAT_PRIVATE_KEY_BASE64=商户API私钥的Base64内容
 ```
 
 **重要提示**：

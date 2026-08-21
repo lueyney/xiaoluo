@@ -338,6 +338,7 @@ window.claimInviteRewards = async function() {
 };
 
 window.handleBuy = function(btn) {
+    if (!btn || btn.disabled || window.__buyPackagePending) return;
     var id      = parseInt(btn.dataset.id);
     var credits = parseInt(btn.dataset.credits);
     var price   = parseFloat(btn.dataset.price);
@@ -347,6 +348,13 @@ window.handleBuy = function(btn) {
 
 window.buyPackage = async function(id, name, credits, price) {
     if (!auth.requireLogin()) return;
+    if (window.__buyPackagePending) {
+        utils.showToast('订单正在创建，请勿重复点击', 'error');
+        return;
+    }
+    window.__buyPackagePending = true;
+    var buyButtons = Array.prototype.slice.call(document.querySelectorAll('.pkg-buy-btn:not([disabled])'));
+    buyButtons.forEach(function(button) { button.disabled = true; });
     try {
         utils.showLoading('创建订单...');
         var req = {
@@ -376,6 +384,9 @@ window.buyPackage = async function(id, name, credits, price) {
     } catch(e) {
         utils.hideLoading();
         utils.showToast(e.message || '购买失败', 'error');
+    } finally {
+        window.__buyPackagePending = false;
+        buyButtons.forEach(function(button) { button.disabled = false; });
     }
 };
 

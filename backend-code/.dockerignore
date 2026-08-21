@@ -1,4 +1,7 @@
 .env
+.env.*
+certs/*.pem
+certs/*.p12
 *.log
 logs
 exports

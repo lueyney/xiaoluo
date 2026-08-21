@@ -29,7 +29,7 @@
 #### 1.3 APIv3 密钥
 - 位置：商户平台 -> 账户中心 -> API安全 -> APIv3密钥
 - 长度：32位字符串
-- **当前配置**：`ajiof2135watgfsdg2315waq1g32sa1g`
+- 仅保存在云平台密钥环境变量 `WECHAT_APIV3_KEY` 中，不要写入代码、日志或文档
 
 #### 1.4 商户API证书
 - 位置：商户平台 -> 账户中心 -> API安全 -> API证书
@@ -56,7 +56,7 @@ backend-code/
       └── apiclient_key.pem  ← 商户私钥文件
 ```
 
-**当前状态**：您提到证书在 `backend-code/certs/` 文件夹，但目录为空，请放置证书文件。
+云平台部署建议将私钥进行 Base64 编码后配置为 `WECHAT_PRIVATE_KEY_BASE64`；本地开发也可将文件放在 `backend-code/certs/apiclient_key.pem`。
 
 ### 步骤3：配置环境变量
 
@@ -69,16 +69,17 @@ WECHAT_APP_SECRET=your_app_secret_here    # 替换为实际的AppSecret
 
 # 微信支付V3配置
 WECHAT_MCH_ID=1234567890                  # 替换为实际的商户号（10位数字）
-WECHAT_APIV3_KEY=ajiof2135watgfsdg2315waq1g32sa1g
+WECHAT_APIV3_KEY=替换为32字节APIv3密钥
 WECHAT_CERT_SERIAL=5157F09EFDC096DE15EBE81A47057A72  # 替换为实际的证书序列号
-WECHAT_NOTIFY_URL=https://yourdomain.com/api/payment/wechat-notify  # 支付回调地址
+WECHAT_NOTIFY_URL=https://yourdomain.com/api/wechat-pay/notify  # 支付回调地址
+WECHAT_PRIVATE_KEY_BASE64=替换为商户API私钥的Base64内容
 ```
 
 ### 步骤4：配置商户平台
 
 #### 4.1 设置支付回调URL
 - 位置：商户平台 -> 产品中心 -> 开发配置 -> 支付配置
-- 设置：`https://yourdomain.com/api/payment/wechat-notify`
+- 设置：`https://yourdomain.com/api/wechat-pay/notify`
 - **必须是 HTTPS 外网可访问地址**
 
 #### 4.2 设置小程序支付域名
@@ -285,16 +286,14 @@ backend-code/
 
 请在微信商户平台首页查看您的真实商户号。
 
-### 证书文件
-当前 `backend-code/certs/` 目录为空，请：
-1. 从微信商户平台下载证书
-2. 将 `apiclient_key.pem` 放入该目录
-3. 确保文件权限正确（建议 600）
+### 商户私钥
+三种配置方式任选一种：
+1. 云平台推荐：`WECHAT_PRIVATE_KEY_BASE64`
+2. 多行环境变量：`WECHAT_PRIVATE_KEY`
+3. 挂载私钥文件并设置 `WECHAT_PRIVATE_KEY_PATH`
 
 ### APIv3密钥
-当前已配置：`ajiof2135watgfsdg2315waq1g32sa1g`
-
-如需修改，请在商户平台设置新密钥并更新 `.env` 文件。
+只在商户平台和部署平台的密钥环境变量中维护；如果密钥曾进入Git历史或公开文档，请立即轮换。
 
 ### 回调地址
 必须满足：

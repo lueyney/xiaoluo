@@ -1,5 +1,4 @@
 // 微信支付 API 路由（网页端 Native 扫码支付）
-// 商户号：1730723347
 
 const express = require('express');
 const { body, validationResult } = require('express-validator');
@@ -203,6 +202,14 @@ router.post('/create-order', [
       });
     }
 
+    const configCheck = wechatPayV3.ensurePaymentConfigured('create-mini-program-order');
+    if (!configCheck.ready) {
+      return res.status(503).json({
+        error: '微信支付服务暂不可用，请稍后再试',
+        code: configCheck.code
+      });
+    }
+
     const session = await code2Session(code);
     if (!session || !session.openid) {
       return res.status(400).json({ error: '获取微信用户标识失败，请重试', code: 'WECHAT_CODE_INVALID' });
@@ -228,6 +235,9 @@ router.post('/create-order', [
 
     if (!jsapiResult.success) {
       await query(`UPDATE payment_orders SET status='failed' WHERE id=?`, [orderId]);
+      if (jsapiResult.code === 'WECHAT_PAY_NOT_CONFIGURED') {
+        return res.status(503).json({ error: '微信支付服务暂不可用，请稍后再试', code: jsapiResult.code });
+      }
       return res.status(500).json({ error: '创建支付订单失败', code: 'WECHAT_PAY_FAILED', message: jsapiResult.error });
     }
 
@@ -236,6 +246,9 @@ router.post('/create-order', [
   } catch (err) {
     if (err.code === 'FIRST_RECHARGE_USED') {
       return res.status(400).json({ error: err.message, code: err.code });
+    }
+    if (err.code === 'WECHAT_PAY_NOT_CONFIGURED') {
+      return res.status(503).json({ error: '微信支付服务暂不可用，请稍后再试', code: err.code });
     }
     logger.error('[MiniPay] 创建订单失败:', err);
     return res.status(500).json({ error: '创建订单失败', code: 'CREATE_ORDER_ERROR', message: err.message });
@@ -347,8 +360,48 @@ router.post('/create-web-order', [
       return res.json({ code: 'SUCCESS', message: '积分已到账', data: { free: true, credits, balance: finalBalance } });
     }
 
-    // 付费套餐：创建订单 + Native 下单
-    const { orderId, outTradeNo } = await transaction(async (conn) => {
+    const configCheck = wechatPayV3.ensurePaymentConfigured('create-web-order');
+    if (!configCheck.ready) {
+      return res.status(503).json({
+        error: '微信支付服务暂不可用，请稍后再试',
+        code: configCheck.code
+      });
+    }
+
+    // 付费套餐：同一用户/套餐短时间内只保留一个有效Native订单，避免双击重复下单。
+    const orderState = await transaction(async (conn) => {
+      const [lockedUsers] = await conn.execute('SELECT id FROM users WHERE id=? FOR UPDATE', [userId]);
+      if (!lockedUsers.length) throw Object.assign(new Error('用户不存在'), { code: 'USER_NOT_FOUND' });
+      const [existingRows] = await conn.execute(
+        `SELECT id,out_trade_no,code_url,TIMESTAMPDIFF(SECOND,created_at,NOW()) AS age_seconds
+           FROM payment_orders
+          WHERE user_id=? AND package_id=? AND amount=? AND credits=?
+            AND status='pending' AND out_trade_no LIKE 'WEBORD%'
+            AND created_at >= DATE_SUB(NOW(),INTERVAL 10 MINUTE)
+          ORDER BY id DESC LIMIT 1 FOR UPDATE`,
+        [userId, packageId, amount, credits]
+      );
+
+      const existing = existingRows[0];
+      if (existing && existing.code_url) {
+        return {
+          reused: true,
+          orderId: existing.id,
+          outTradeNo: existing.out_trade_no,
+          codeUrl: existing.code_url
+        };
+      }
+      if (existing && Number(existing.age_seconds) < 30) {
+        return {
+          creating: true,
+          orderId: existing.id,
+          outTradeNo: existing.out_trade_no
+        };
+      }
+      if (existing) {
+        await conn.execute("UPDATE payment_orders SET status='failed' WHERE id=? AND status='pending'", [existing.id]);
+      }
+
       const [ins] = await conn.execute(
         `INSERT INTO payment_orders (user_id,package_id,amount,credits,is_first_recharge,status,created_at) VALUES (?,?,?,?,?,'pending',NOW())`,
         [userId, packageId, amount, credits, effectiveFirst ? 1 : 0]
@@ -359,6 +412,29 @@ router.post('/create-web-order', [
       return { orderId: ins.insertId, outTradeNo: no };
     });
 
+    if (orderState.reused) {
+      logger.info(`[WebPay] 复用待支付订单: ID=${orderState.orderId}, 单号=${orderState.outTradeNo}`);
+      return res.json({
+        code: 'SUCCESS',
+        data: {
+          orderId: orderState.orderId,
+          outTradeNo: orderState.outTradeNo,
+          amount,
+          credits,
+          codeUrl: orderState.codeUrl,
+          reused: true
+        }
+      });
+    }
+    if (orderState.creating) {
+      return res.status(409).json({
+        error: '支付订单正在创建，请勿重复点击',
+        code: 'ORDER_CREATION_IN_PROGRESS'
+      });
+    }
+
+    const { orderId, outTradeNo } = orderState;
+
     logger.info(`[WebPay] 订单: ID=${orderId}, 单号=${outTradeNo}`);
 
     const nativeResult = await wechatPayV3.createNativeOrder({
@@ -367,22 +443,16 @@ router.post('/create-web-order', [
       amount: Math.round(amount * 100)
     });
 
-    if (nativeResult.mock) return res.json({ code: 'SUCCESS', data: { orderId, amount, credits, codeUrl: null, mock: true } });
-
     if (!nativeResult.success) {
       await query(`UPDATE payment_orders SET status='failed' WHERE id=?`, [orderId]);
       if (nativeResult.code === 'NO_AUTH') return res.status(503).json({ error: '当前暂不支持扫码支付，请联系管理员开通该功能', code: 'NO_AUTH' });
-      if (nativeResult.code === 'PAY_CONFIG_ERROR') {
-        return res.status(503).json({ error: '支付服务配置未完成，请联系客服', code: 'PAY_CONFIG_ERROR' });
+      if (nativeResult.code === 'WECHAT_PAY_NOT_CONFIGURED') {
+        return res.status(503).json({ error: '微信支付服务暂不可用，请稍后再试', code: nativeResult.code });
       }
-      logger.error('[WebPay] 微信 Native 下单失败', {
-        orderId,
-        outTradeNo,
-        providerCode: nativeResult.code || null,
-        providerError: nativeResult.error || null
-      });
-      return res.status(502).json({ error: '微信支付暂时不可用，请稍后重试或联系客服', code: nativeResult.code || 'WECHAT_PAY_FAILED' });
+      return res.status(500).json({ error: '创建支付二维码失败', code: 'WECHAT_PAY_FAILED', message: nativeResult.error });
     }
+
+    await query('UPDATE payment_orders SET code_url=? WHERE id=? AND status=\'pending\'', [nativeResult.codeUrl, orderId]);
 
     return res.json({ code: 'SUCCESS', data: { orderId, outTradeNo, amount, credits, codeUrl: nativeResult.codeUrl } });
 
