@@ -40,4 +40,29 @@ describe('rewrite paragraph layout', () => {
   test('one sentence result cannot introduce a new paragraph', () => {
     expect(ensureEndPunct('原句。', '改写前半句\n改写后半句。')).toBe('改写前半句改写后半句。');
   });
+
+  test('keeps closing quotes with the preceding sentence', () => {
+    const sentences = splitSentences('“别看。”身后的声音仍很平静：“不要下去。”');
+    expect(sentences.map((item) => item.text)).toEqual([
+      '“别看。”',
+      '身后的声音仍很平静：“不要下去。”'
+    ]);
+  });
+
+  test('does not append punctuation after a closing quote', () => {
+    expect(ensureEndPunct('原句。', '“改写结果。”')).toBe('“改写结果。”');
+    expect(ensureEndPunct('原句！', '“改写结果！”')).toBe('“改写结果！”');
+    expect(ensureEndPunct('原句？', '“改写结果？”')).toBe('“改写结果？”');
+  });
+
+  test('normalizes an obvious duplicated terminal after a closing quote', () => {
+    expect(ensureEndPunct('原句。', '“改写结果。”。')).toBe('“改写结果。”');
+    expect(ensureEndPunct('原句！', '“改写结果！”!')).toBe('“改写结果！”');
+    expect(splitSentences('“别看。”。下一句。').map((item) => item.text))
+      .toEqual(['“别看。”', '下一句。']);
+  });
+
+  test('preserves intentional mixed terminal punctuation around a quote', () => {
+    expect(ensureEndPunct('原句！', '“真的吗？”！')).toBe('“真的吗？”！');
+  });
 });

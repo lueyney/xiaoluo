@@ -46,7 +46,7 @@ describe('writing workflow product routing', () => {
       ])
     }));
     expect(runPublishedWritingWorkflow).not.toHaveBeenCalled();
-    expect(result.content).toBe('测试内容');
+    expect(result.content).toBe('**测试内容**');
     expect(result.steps).toEqual([expect.objectContaining({
       name: `direct-deepseek:${docType}`,
       status: 'completed',

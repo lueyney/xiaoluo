@@ -100,6 +100,10 @@ class API {
         return this.post('/title-generator/generate', { field, excludeTitles }, { _timeout: 45000 });
     }
 
+    async generateSocialContent(data) {
+        return this.post('/social/generate', data, { _timeout: 180000 });
+    }
+
     // ==================== 订单状态轮询（对标小程序 GET /api/orders/:id）====================
     async getOrderStatus(orderId) {
         return this.get(`/orders/${orderId}`);

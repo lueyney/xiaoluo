@@ -16,6 +16,12 @@ const {
 } = require('../services/ai-model-router');
 const { getRewriteConfig, buildRewritePayload } = require('../services/rewrite-config');
 const { groupRewriteTasks, buildChainedRewriteContext } = require('../services/rewrite-groups');
+const {
+  beginRewriteAuditRun,
+  auditRewriteRequest,
+  auditRewriteUsage,
+  endRewriteAuditRun
+} = require('../services/rewrite-audit');
 
 const router = express.Router();
 const LOCAL_REWRITE_TEST_MODE = process.env.NODE_ENV !== 'production'
@@ -30,8 +36,10 @@ router.get('/mode', (req, res) => {
       rewriteConfig: {
         model: rewriteConfig.model,
         temperature: rewriteConfig.temperature,
+        topP: rewriteConfig.topP,
         thinking: rewriteConfig.selection.thinking,
-        reasoningEffort: rewriteConfig.selection.reasoningEffort || 'provider-default'
+        reasoningEffort: rewriteConfig.selection.reasoningEffort || 'provider-default',
+        batchMode: REWRITE_BATCH_MODE
       }
     }
   });
@@ -136,11 +144,14 @@ async function rewriteWithDeepSeek(text, onDelta, rewriteVersion = 'v1', options
     logDeepSeekSelection(logger, selection, { caller: 'rewriteWithDeepSeek' });
 
     let response;
+    let requestPayload;
+    let auditRequestId;
     try {
-      const requestPayload = buildRewritePayload({
+      requestPayload = buildRewritePayload({
         messages: buildRewriteMessages(text, options.context),
         stream: true
       });
+      auditRequestId = auditRewriteRequest(requestPayload, options.audit);
       response = await fetch(baseURL + '/chat/completions', {
         method: 'POST',
         headers: {
@@ -174,6 +185,8 @@ async function rewriteWithDeepSeek(text, onDelta, rewriteVersion = 'v1', options
     const decoder = new TextDecoder('utf-8');
     let buffer = '';
     let result = '';
+    let responseUsage = null;
+    let responseModel = requestPayload.model;
 
   function consumeLine(line) {
     const value = line.trim();
@@ -182,6 +195,8 @@ async function rewriteWithDeepSeek(text, onDelta, rewriteVersion = 'v1', options
     if (!data || data === '[DONE]') return;
     try {
       const payload = JSON.parse(data);
+      if (payload.usage) responseUsage = payload.usage;
+      if (payload.model) responseModel = payload.model;
       const delta = payload && payload.choices && payload.choices[0] && payload.choices[0].delta
         ? payload.choices[0].delta.content
         : '';
@@ -205,6 +220,11 @@ async function rewriteWithDeepSeek(text, onDelta, rewriteVersion = 'v1', options
       }
       buffer += decoder.decode();
       if (buffer.trim()) consumeLine(buffer);
+      auditRewriteUsage(responseUsage, {
+        ...options.audit,
+        requestId: auditRequestId,
+        model: responseModel
+      });
     } catch (error) {
       const timedOut = controller.signal.aborted;
       throw createDeepSeekError(
@@ -244,11 +264,14 @@ async function rewriteWithDeepSeekFallback(text, rewriteVersion = 'v1', context 
     if (!apiKey) throw createDeepSeekError('AI降重服务未配置', { retryable: false, code: 'AI_NOT_CONFIGURED' });
     logDeepSeekSelection(logger, selection, { caller: 'rewriteWithDeepSeekFallback' });
     let response;
+    let requestPayload;
+    let auditRequestId;
     try {
-      const requestPayload = buildRewritePayload({
+      requestPayload = buildRewritePayload({
         messages: buildRewriteMessages(text, context),
         stream: false
       });
+      auditRequestId = auditRewriteRequest(requestPayload, { ...context.audit, phase: 'fallback' });
       response = await fetch(baseURL + '/chat/completions', {
         method: 'POST',
         headers: {
@@ -273,7 +296,14 @@ async function rewriteWithDeepSeekFallback(text, rewriteVersion = 'v1', context 
         retryable: false
       });
     }
-    const rewritten = extractMessageContent(await response.json()).trim();
+    const responsePayload = await response.json();
+    auditRewriteUsage(responsePayload.usage, {
+      ...context.audit,
+      phase: 'fallback',
+      requestId: auditRequestId,
+      model: responsePayload.model || requestPayload.model
+    });
+    const rewritten = extractMessageContent(responsePayload).trim();
     if (!rewritten) {
       throw createDeepSeekError('DeepSeek fallback 返回空结果', {
         code: 'DEEPSEEK_FALLBACK_EMPTY_OUTPUT',
@@ -313,6 +343,49 @@ function isHeading(para, { firstContentParagraph = false } = {}) {
   return effectiveContentLength(text) <= SHORT_HEADING_MAX_CONTENT_LENGTH;
 }
 
+const SENTENCE_END_PUNCTUATION = /[\u3002\uff01\uff1f!?]/u;
+const SENTENCE_CLOSERS = /[\u201d\u2019"'\u300f\u300d\u300b\u3009\u3011\u3015\uff09)\]]/u;
+const TERMINAL_SUFFIX = /([\u3002\uff01\uff1f!?])(?:[\u201d\u2019"'\u300f\u300d\u300b\u3009\u3011\u3015\uff09)\]]*)$/u;
+
+function normalizeDuplicateTerminalPunctuation(text) {
+  return String(text || '').replace(
+    /([\u3002\uff01\uff1f!?])([\u201d\u2019"'\u300f\u300d\u300b\u3009\u3011\u3015\uff09)\]]+)([\u3002\uff01\uff1f!?]+)$/u,
+    (matched, innerTerminal, closers, outerTerminals) => {
+      const family = (terminal) => {
+        if (terminal === '\uff01' || terminal === '!') return '!';
+        if (terminal === '\uff1f' || terminal === '?') return '?';
+        return terminal;
+      };
+      return [...outerTerminals].every((terminal) => family(terminal) === family(innerTerminal))
+        ? innerTerminal + closers
+        : matched;
+    }
+  );
+}
+
+function splitParagraphSentences(paragraph) {
+  const parts = [];
+  let start = 0;
+  for (let index = 0; index < paragraph.length; index += 1) {
+    if (!SENTENCE_END_PUNCTUATION.test(paragraph[index])) continue;
+    let end = index + 1;
+    while (end < paragraph.length && SENTENCE_CLOSERS.test(paragraph[end])) end += 1;
+    // Keep terminals after a closing quote in the same slice. The normalizer
+    // removes same-kind duplicates such as `。"。`, while preserving an
+    // intentional mixed ending such as `？"！`.
+    if (end > index + 1) {
+      while (end < paragraph.length && SENTENCE_END_PUNCTUATION.test(paragraph[end])) end += 1;
+    }
+    const sentence = normalizeDuplicateTerminalPunctuation(paragraph.slice(start, end).trim());
+    if (sentence) parts.push(sentence);
+    start = end;
+    index = end - 1;
+  }
+  const remainder = normalizeDuplicateTerminalPunctuation(paragraph.slice(start).trim());
+  if (remainder) parts.push(remainder);
+  return parts;
+}
+
 function splitSentences(text) {
   const sentences = [];
   const paragraphs = text.split(/\r\n|\n/);
@@ -323,7 +396,7 @@ function splitSentences(text) {
     const firstContentParagraph = !hasContent;
     hasContent = true;
     if (isHeading(para, { firstContentParagraph })) { sentences.push({ text: para, pIdx, isTitle: true }); continue; }
-    const parts = para.split(/(?<=[\u3002\uff01\uff1f])/);
+    const parts = splitParagraphSentences(para);
     for (const part of parts) { const s = part.trim(); if (s) sentences.push({ text: s, pIdx, isTitle: false }); }
   }
   return sentences;
@@ -359,19 +432,19 @@ function ensureEndPunct(original, rewritten) {
   if (!rewritten) return rewritten;
   // One source sentence owns one output slot. Remove model-introduced line
   // breaks so grouping/concurrency can never create extra paragraphs.
-  const cleaned = rewritten.replace(/[\r\n]+/g, '').trim();
+  const cleaned = normalizeDuplicateTerminalPunctuation(rewritten.replace(/[\r\n]+/g, '').trim());
   if (!cleaned) return original.trim();
-  const PUNCTS = /[\u3002\uff01\uff1f]$/;
-  if (PUNCTS.test(original.trim()) && !PUNCTS.test(cleaned)) return cleaned + original.trim().slice(-1);
+  const originalTerminal = original.trim().match(TERMINAL_SUFFIX);
+  if (originalTerminal && !TERMINAL_SUFFIX.test(cleaned)) return cleaned + originalTerminal[1];
   return cleaned;
 }
 
-// Four effective sentences form one serial chain. Chains run concurrently so
+// Five effective sentences form one serial chain. Chains run concurrently so
 // each sentence can consume the previous rewritten result without turning the
 // whole document into one long serial job.
 const REWRITE_GROUP_SIZE = Math.min(
   16,
-  Math.max(1, Number.parseInt(process.env.REWRITE_GROUP_SIZE || '4', 10) || 4)
+  Math.max(1, Number.parseInt(process.env.REWRITE_GROUP_SIZE || '5', 10) || 5)
 );
 const REWRITE_CONCURRENCY = Math.min(
   DEEPSEEK_GLOBAL_CONCURRENCY,
@@ -397,6 +470,8 @@ const DOCUMENT_REWRITE_MIN_CONCURRENCY = Math.min(
   DOCUMENT_REWRITE_INITIAL_CONCURRENCY,
   Math.max(1, Number.parseInt(process.env.DOCUMENT_REWRITE_MIN_CONCURRENCY || '8', 10) || 8)
 );
+const REWRITE_BATCH_MODE = String(process.env.REWRITE_BATCH_MODE || 'sentence').trim().toLowerCase();
+const REWRITE_BATCH_ENABLED = REWRITE_BATCH_MODE === 'group';
 
 function effectiveContentLength(text) {
   return ((text || '').match(/[\p{L}\p{N}]/gu) || []).length;
@@ -432,15 +507,28 @@ async function rewriteSentences(sentences, {
       promptVariant: academicAlternation ? academicPromptVariantForIndex(tasks.length) : null
     });
   }
+  const groups = groupRewriteTasks(tasks, REWRITE_GROUP_SIZE);
   logger.info('AI降重任务拆分完成', {
     model: getRewriteConfig().model,
     rewriteVersion,
-    requestMode: 'one-sentence-per-request',
+    requestMode: REWRITE_BATCH_ENABLED ? 'five-sentences-per-request-experimental' : 'one-sentence-per-request',
     sentenceUnits: sentences.length,
-    requestCount: tasks.length,
+    requestCount: REWRITE_BATCH_ENABLED ? groups.length : tasks.length,
     skippedCount: sentences.length - tasks.length
   });
-  const groups = groupRewriteTasks(tasks, REWRITE_GROUP_SIZE);
+  const auditRunId = beginRewriteAuditRun({
+    model: getRewriteConfig().model,
+    temperature: getRewriteConfig().temperature,
+    topP: getRewriteConfig().topP,
+    thinking: getRewriteConfig().selection.thinking,
+    reasoningEffort: getRewriteConfig().selection.reasoningEffort || 'provider-default',
+    rewriteVersion,
+    groupSize: REWRITE_GROUP_SIZE,
+    groupCount: groups.length,
+    sentenceUnits: sentences.length,
+    requestCount: REWRITE_BATCH_ENABLED ? groups.length : tasks.length,
+    skippedCount: sentences.length - tasks.length
+  });
 
   const workerCeiling = Math.min(
     256,
@@ -469,9 +557,9 @@ async function rewriteSentences(sentences, {
     return Math.max(Number(error && error.retryAfterMs) || 0, exponential + jitter);
   }
 
-  async function executeTask(task, reportPressure, previousTask = null) {
+  async function executeTask(task, reportPressure, previousTasks = [], groupIndex = null, groupPosition = null) {
     const { idx, sentObj, promptVariant } = task;
-    const context = buildChainedRewriteContext(sentences, results, task, previousTask);
+    const context = buildChainedRewriteContext(sentences, results, task, previousTasks);
     let lastError = null;
     let attempts = 0;
     let pressure = false;
@@ -481,7 +569,18 @@ async function rewriteSentences(sentences, {
       try {
         const rewritten = await rewriteWithDeepSeek(sentObj.text, (delta) => {
           if (delta && onDelta) onDelta(delta, idx, sentObj);
-        }, rewriteVersion, { context });
+        }, rewriteVersion, {
+          context,
+          audit: {
+            runId: auditRunId,
+            phase: 'primary',
+            attempt: attempt + 1,
+            sentenceIndex: idx,
+            groupIndex,
+            groupPosition,
+            contextCount: context.previousRewrittenSentences.length
+          }
+        });
         if (!rewritten) {
           throw createDeepSeekError('DeepSeek 返回内容不可用', {
             code: 'DEEPSEEK_EMPTY_OUTPUT',
@@ -506,7 +605,18 @@ async function rewriteSentences(sentences, {
     if (adaptiveConcurrency && (!lastError || lastError.retryable !== false)) {
       try {
         attempts += 1;
-        const fallbackText = await rewriteWithDeepSeekFallback(sentObj.text, rewriteVersion, context);
+        const fallbackText = await rewriteWithDeepSeekFallback(sentObj.text, rewriteVersion, {
+          ...context,
+          audit: {
+            runId: auditRunId,
+            phase: 'fallback',
+            attempt: attempts,
+            sentenceIndex: idx,
+            groupIndex,
+            groupPosition,
+            contextCount: context.previousRewrittenSentences.length
+          }
+        });
         if (!fallbackText) {
           throw createDeepSeekError('DeepSeek fallback 返回内容不可用', {
             code: 'DEEPSEEK_FALLBACK_EMPTY_OUTPUT',
@@ -536,7 +646,7 @@ async function rewriteSentences(sentences, {
   }
 
   if (!tasks.length) {
-    return {
+    const emptyOutcome = {
       results,
       failedCount,
       retriedCount,
@@ -544,6 +654,79 @@ async function rewriteSentences(sentences, {
       fallbackRecoveredCount,
       concurrency: { adaptive: adaptiveConcurrency, min: 0, max: 0, final: 0 }
     };
+    endRewriteAuditRun(auditRunId, { ...emptyOutcome, results: undefined });
+    return emptyOutcome;
+  }
+
+  function parseBatchRewriteOutput(output, expectedCount) {
+    const normalized = String(output || '').replace(/```[\s\S]*?\n?|```/g, '').trim();
+    const lines = normalized.split(/\r?\n/).map((line) => line
+      .replace(/^\s*(?:\d+[.、)）]|[-*])\s*/u, '')
+      .replace(/^【|】$/g, '')
+      .trim()).filter(Boolean);
+    return lines.length === expectedCount ? lines : null;
+  }
+
+  async function executeBatchGroup(group, reportPressure, groupIndex) {
+    const batchTexts = group.map((task) => task.sentObj.text);
+    const firstTask = group[0];
+    const batchContext = { batchTexts };
+    let lastError = null;
+    let attempts = 0;
+    for (let attempt = 0; attempt <= retryLimit; attempt += 1) {
+      attempts += 1;
+      try {
+        const output = await rewriteWithDeepSeek('', null, rewriteVersion, {
+          context: batchContext,
+          audit: {
+            runId: auditRunId,
+            phase: 'primary-batch',
+            attempt: attempt + 1,
+            sentenceIndex: firstTask.idx,
+            groupIndex,
+            groupPosition: null,
+            contextCount: 0,
+            batchCount: group.length
+          }
+        });
+        const rewrittenLines = parseBatchRewriteOutput(output, group.length);
+        if (!rewrittenLines) throw createDeepSeekError('批量降重返回句数不匹配', { code: 'DEEPSEEK_BATCH_SHAPE_ERROR', retryable: true });
+        group.forEach((task, index) => {
+          results[task.idx] = ensureEndPunct(task.sentObj.text, rewrittenLines[index]);
+          if (onResult) onResult(results[task.idx], task.idx, task.sentObj, false, {
+            attempts,
+            fallback: false,
+            recoveredByFallback: false,
+            promptVariant: task.promptVariant,
+            concurrency: currentLimit,
+            batch: true,
+            batchSize: group.length
+          });
+        });
+        if (attempts > 1) retriedCount += 1;
+        return { failed: false, pressure: false, skipIncrease: false, attempts };
+      } catch (error) {
+        lastError = error;
+        if (error.status === 429 || error.status === 503 || error.code === 'DEEPSEEK_TIMEOUT'
+          || error.code === 'DEEPSEEK_NETWORK_ERROR' || error.code === 'DEEPSEEK_STREAM_ERROR') {
+          reportPressure();
+        }
+        if (attempt >= retryLimit || error.retryable === false) break;
+        await sleep(retryDelay(error, attempt));
+      }
+    }
+    // Experimental mode is fail-safe: if a batch cannot be parsed, preserve
+    // the original sentence-by-sentence implementation for this group.
+    let failed = false;
+    const previousTasks = [];
+    for (let position = 0; position < group.length; position += 1) {
+      const task = group[position];
+      const outcome = await executeTask(task, reportPressure, previousTasks, groupIndex, position);
+      failed = failed || outcome.failed;
+      if (!outcome.failed) previousTasks.push(task);
+    }
+    if (lastError) retriedCount += 1;
+    return { failed, pressure: true, skipIncrease: true, attempts };
   }
 
   let nextGroup = 0;
@@ -570,18 +753,27 @@ async function rewriteSentences(sentences, {
 
     function launch() {
       while (active < currentLimit && nextGroup < groups.length) {
+        const groupIndex = nextGroup;
         const group = groups[nextGroup++];
         active += 1;
         (async () => {
-          let previousTask = null;
+          const previousTasks = [];
           let groupPressure = false;
           let groupFailed = false;
           let groupSkipIncrease = false;
-          for (const task of group) {
+          if (REWRITE_BATCH_ENABLED && group.length > 1) {
+            const batchOutcome = await executeBatchGroup(group, () => {
+              groupPressure = true;
+              tune({ pressure: true, failed: false, skipIncrease: true });
+            }, groupIndex);
+            groupFailed = batchOutcome.failed;
+            groupSkipIncrease = batchOutcome.skipIncrease;
+          } else for (let groupPosition = 0; groupPosition < group.length; groupPosition++) {
+            const task = group[groupPosition];
             const outcome = await executeTask(task, () => {
               groupPressure = true;
               tune({ pressure: true, failed: false, skipIncrease: true });
-            }, previousTask);
+            }, previousTasks, groupIndex, groupPosition);
             groupPressure = groupPressure || outcome.pressure;
             groupFailed = groupFailed || outcome.failed;
             groupSkipIncrease = groupSkipIncrease || outcome.skipIncrease;
@@ -592,7 +784,11 @@ async function rewriteSentences(sentences, {
               promptVariant: task.promptVariant,
               concurrency: currentLimit
             });
-            previousTask = outcome.failed ? null : task;
+            if (outcome.failed) previousTasks.length = 0;
+            else {
+              previousTasks.push(task);
+              if (previousTasks.length > 2) previousTasks.shift();
+            }
           }
           return { failed: groupFailed, pressure: groupPressure, skipIncrease: groupSkipIncrease };
         })().then((outcome) => {
@@ -609,7 +805,7 @@ async function rewriteSentences(sentences, {
     launch();
   });
 
-  return {
+  const outcome = {
     results,
     failedCount,
     retriedCount,
@@ -623,6 +819,14 @@ async function rewriteSentences(sentences, {
       ceiling: workerCeiling
     }
   };
+  endRewriteAuditRun(auditRunId, {
+    failedCount,
+    retriedCount,
+    fallbackCount,
+    fallbackRecoveredCount,
+    concurrency: outcome.concurrency
+  });
+  return outcome;
 }
 
 async function finalizeOrder(userId, orderId, rewrittenText, wordCount, creditsCost) {

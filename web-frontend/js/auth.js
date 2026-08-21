@@ -508,7 +508,7 @@ document.addEventListener('DOMContentLoaded', () => {
         loginForm.addEventListener('submit', async (e) => {
             e.preventDefault();
             const phone = document.getElementById('loginPhone').value.trim();
-            const idleLabel = '验证并进入工作台';
+            const idleLabel = '开始创作';
             setFormMessage('loginForm', '');
             
             if (!phone || phone.length !== 11) {

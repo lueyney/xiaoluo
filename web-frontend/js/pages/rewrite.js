@@ -526,16 +526,9 @@ router.register('rewrite', function() {
                     <i class="fas fa-coins" aria-hidden="true"></i>
                     <span>计费标准：<strong>${CONFIG.REWRITE_CREDITS_PER_1000} 积分 / 千字</strong></span>
                 </div>
-                <section class="rewrite-ai-commitment" aria-labelledby="rewriteAiCommitmentTitle">
-                    <div class="rewrite-ai-commitment-icon" aria-hidden="true">
-                        <i class="fas fa-shield-heart"></i>
-                    </div>
-                    <div class="rewrite-ai-commitment-content">
-                        <h3 id="rewriteAiCommitmentTitle">让 AI 成为工具，而不是门槛</h3>
-                        <p>我们提倡学生与创作者高效、负责地使用 AI，而不是让大家因担心“被检测出来”而害怕使用。当前学术检测标准不一，容易让使用者无所适从；部分社交平台检测机制属于黑盒，判定过程和依据也不透明。</p>
-                        <p class="rewrite-ai-commitment-promise"><strong>本站承诺：</strong>单次提交原文不少于 2000 字，使用本站返回的完整 AI 降重结果进行朱雀检测，AI 率应低于 30%。如检测结果仍超过 30%，请保留订单记录与完整检测报告，联系客服核验后退还本次降重实际消耗的积分。</p>
-                        <p class="rewrite-ai-commitment-terms">适用说明：检测文本须与本站完整返回结果一致，未经二次改写、删减、拆分或拼接，并以朱雀同一检测版本的完整报告为核验依据。</p>
-                    </div>
+                <section class="rewrite-ai-commitment" aria-label="朱雀检测说明">
+                    <i class="fas fa-circle-info" aria-hidden="true"></i>
+                    <p>朱雀大模型检测AI特征高于30%，请联系客服。</p>
                 </section>
             </div>
         </div>

@@ -30,6 +30,11 @@ const TASK_CONFIG = Object.freeze({
     reasoningEnv: 'DEEPSEEK_TITLE_REASONING_EFFORT',
     thinkingEnv: 'DEEPSEEK_TITLE_THINKING'
   },
+  social: {
+    modelEnv: 'DEEPSEEK_SOCIAL_MODEL',
+    reasoningEnv: 'DEEPSEEK_SOCIAL_REASONING_EFFORT',
+    thinkingEnv: 'DEEPSEEK_SOCIAL_THINKING'
+  },
   workflow: {
     modelEnv: 'DEEPSEEK_WORKFLOW_MODEL',
     reasoningEnv: 'DEEPSEEK_WORKFLOW_REASONING_EFFORT',

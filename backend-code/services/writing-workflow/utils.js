@@ -66,7 +66,6 @@ function cleanDirectDocumentContent(content) {
     .replace(/^\uFEFF/, '')
     .replace(/^```(?:markdown|md|text)?\s*\r?\n?/i, '')
     .replace(/\r?\n?```\s*$/i, '')
-    .replace(/\*/g, '')
     .trim();
 }
 

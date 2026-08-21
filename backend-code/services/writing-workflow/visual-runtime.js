@@ -3,7 +3,7 @@ const workflowStore = require('../workflow-studio/store');
 const { normalizePlan } = require('./graph');
 const { buildPlanningMessages, buildSectionMessages } = require('./prompts');
 const { searchAcademic } = require('./plugins/academic-search');
-const { countWords, createTraceId, parseTargetWords } = require('./utils');
+const { cleanDirectDocumentContent, countWords, createTraceId, parseTargetWords } = require('./utils');
 
 function findPlanValue(values) {
   return Object.values(values || {}).find((value) => value && Array.isArray(value.sections) && value.title);
@@ -411,9 +411,11 @@ async function runPublishedWritingWorkflow(input, { provider, config }) {
   const output = result.output && typeof result.output === 'object'
     ? result.output
     : { content: String(result.output || '') };
+  const content = cleanDirectDocumentContent(output.content || '');
   return {
     ...output,
-    wordCount: output.wordCount || countWords(output.content || ''),
+    content,
+    wordCount: countWords(content),
     steps: (result.trace || []).map((item) => ({
       name: `${item.workflowId}:${item.nodeId}`,
       status: 'completed',

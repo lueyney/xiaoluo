@@ -8,6 +8,7 @@ const labels = {
   planning: '论文结构规划',
   drafting: '论文正文撰写',
   title: 'AI 题目生成',
+  social: '社交平台创作',
   workflow: '可视化工作流节点'
 };
 

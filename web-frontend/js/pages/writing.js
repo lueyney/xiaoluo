@@ -1,5 +1,5 @@
 /**
- * 创作页面 — 学术写作与社交发布
+ * 创作页面：学术写作、小说创作与社交平台
  */
 (function () {
     'use strict';
@@ -40,7 +40,8 @@
     <div class="wrt-wrap">
         <div class="wrt-workspace-switch" role="tablist" aria-label="创作工作区">
             <button type="button" class="wrt-workspace-tab is-active" data-workspace="academic" role="tab" aria-selected="true"><span class="wrt-workspace-icon"><i class="fas fa-graduation-cap"></i></span><strong>学术写作</strong></button>
-            <button type="button" class="wrt-workspace-tab" data-workspace="social" role="tab" aria-selected="false"><span class="wrt-workspace-icon"><i class="fas fa-pen-nib"></i></span><strong>社交发布</strong></button>
+            <button type="button" class="wrt-workspace-tab" data-workspace="novel" role="tab" aria-selected="false"><span class="wrt-workspace-icon"><i class="fas fa-book-open"></i></span><strong>小说创作</strong></button>
+            <button type="button" class="wrt-workspace-tab" data-workspace="social" role="tab" aria-selected="false"><span class="wrt-workspace-icon"><i class="fas fa-pen-nib"></i></span><strong>社交平台</strong></button>
         </div>
         <div id="wrtAcademicWorkspace" class="wrt-workspace-panel is-active">
         <div class="wrt-header-card">
@@ -67,7 +68,7 @@
                         <div class="social-platform-row" role="tablist" aria-label="发布平台"><button type="button" class="social-platform is-active" data-platform="xiaohongshu" role="tab" aria-selected="true"><span><i class="fas fa-bookmark"></i></span><b>小红书</b><small>图文笔记</small></button><button type="button" class="social-platform" data-platform="douyin" role="tab" aria-selected="false"><span><i class="fas fa-circle-play"></i></span><b>抖音</b><small>视频文案</small></button><button type="button" class="social-platform" data-platform="wechat" role="tab" aria-selected="false"><span><i class="fas fa-newspaper"></i></span><b>公众号</b><small>长文内容</small></button><button type="button" class="social-platform" data-platform="zhihu" role="tab" aria-selected="false"><span><i class="fas fa-circle-question"></i></span><b>知乎</b><small>问答内容</small></button></div>
                         <div class="social-field-label social-material-label"><span>你的素材或想法</span></div>
                         <textarea id="socialInput" class="social-textarea" placeholder="例如：周末去看了一场展览，动线很舒服，适合慢慢逛……&#10;&#10;也可以粘贴原稿、会议记录、产品信息或一段生活经历。"></textarea>
-                        <div class="social-input-meta"><button type="button" class="social-attach-btn" id="socialUploadBtn"><i class="fas fa-paperclip"></i> 添加参考文件</button><input id="socialFileInput" type="file" accept="image/*,.pdf,.doc,.docx" hidden><span id="socialFileName">支持图片、PDF、Word；文字素材仍需填写</span><span class="social-counter" id="socialInputCount">0 字</span></div>
+                        <div class="social-input-meta"><span>支持粘贴原稿、产品信息或生活经历</span><span class="social-counter" id="socialInputCount">0 字</span></div>
                         <div class="social-field-label"><span>补充要求</span><small>可选</small></div>
                         <input id="socialRequirements" class="social-requirements" placeholder="例如：面向新手，语气轻松，保留价格和型号">
                         <div class="social-field-label social-goal-label"><span>内容目标</span></div>
@@ -79,7 +80,13 @@
                         <div class="social-preview" id="socialPreview"><div class="social-preview-empty"><div class="social-empty-icon"><i class="fas fa-file-lines"></i></div><strong>暂无内容</strong><span>生成结果将在这里显示</span></div></div>
                     </section>
                 </div>
-                <div class="social-check-card"><div class="social-card-head"><div><h3>发布检查</h3></div><span class="social-check-score" id="socialCheckScore">未检测</span></div><div class="social-check-list"><span><i class="fas fa-check"></i> 平台长度</span><span><i class="fas fa-check"></i> 标题结构</span><span><i class="fas fa-check"></i> 话题数量</span><span><i class="fas fa-check"></i> 敏感表达</span></div></div>
+            </div>
+        </div>
+        <div id="wrtNovelWorkspace" class="wrt-workspace-panel" hidden>
+            <div class="wrt-workspace-empty">
+                <i class="fas fa-book-open" aria-hidden="true"></i>
+                <h2>小说创作</h2>
+                <p>小说创作功能正在准备中。</p>
             </div>
         </div>
         <div class="wrt-academic-layout">
@@ -132,7 +139,7 @@
                 </section>
 
                 <details class="wrt-advanced" id="wrtAdvanced">
-                    <summary><span><i class="fas fa-sliders"></i><strong>高级设置</strong><small>字数、格式等</small></span><i class="fas fa-chevron-down wrt-advanced-arrow"></i></summary>
+                    <summary><span><i class="fas fa-sliders"></i><strong>高级设置</strong></span><i class="fas fa-chevron-down wrt-advanced-arrow"></i></summary>
                     <div class="wrt-advanced-body">
                         <label class="wrt-control-label" for="wrtRequirements">补充说明 <span class="wrt-optional">可选</span></label>
                         <textarea id="wrtRequirements" class="wrt-input wrt-textarea" rows="4" placeholder="例如：约 5000 字，重点分析应用风险，采用规范学术表达，并包含参考文献建议。"></textarea>
@@ -211,19 +218,27 @@
     function initWorkspaceTabs() {
         const tabs = document.querySelectorAll('.wrt-workspace-tab');
         const academic = document.getElementById('wrtAcademicWorkspace');
+        const novel = document.getElementById('wrtNovelWorkspace');
         const social = document.getElementById('wrtSocialWorkspace');
         // The social prototype is rendered while the academic template is built.
         // Reparent it once so each workspace is an independent sibling panel;
         // otherwise hiding the academic panel would also hide the social panel.
+        if (academic && novel && novel.parentElement === academic) {
+            academic.parentElement.insertBefore(novel, academic.nextSibling);
+        }
         if (academic && social && social.parentElement === academic) {
-            academic.parentElement.insertBefore(social, academic.nextSibling);
+            academic.parentElement.insertBefore(social, novel ? novel.nextSibling : academic.nextSibling);
         }
         tabs.forEach(tab => tab.addEventListener('click', () => {
-            const isSocial = tab.dataset.workspace === 'social';
+            const workspace = tab.dataset.workspace;
             tabs.forEach(item => { const active = item === tab; item.classList.toggle('is-active', active); item.setAttribute('aria-selected', String(active)); });
-            academic.hidden = isSocial; social.hidden = !isSocial;
-            academic.classList.toggle('is-active', !isSocial); social.classList.toggle('is-active', isSocial);
-            if (isSocial) initSocialWorkspace();
+            [academic, novel, social].forEach(panel => {
+                if (!panel) return;
+                const active = panel.id === `wrt${workspace.charAt(0).toUpperCase()}${workspace.slice(1)}Workspace`;
+                panel.hidden = !active;
+                panel.classList.toggle('is-active', active);
+            });
+            if (workspace === 'social') initSocialWorkspace();
         }));
     }
 
@@ -249,30 +264,69 @@
             x.setAttribute('aria-pressed', String(active));
         }));
         if (generate && !generate.dataset.bound) { generate.dataset.bound = '1'; generate.addEventListener('click', renderSocialPreview); }
-        const upload = document.getElementById('socialUploadBtn'), fileInput = document.getElementById('socialFileInput'), fileName = document.getElementById('socialFileName');
-        if (upload && fileInput && !upload.dataset.bound) {
-            upload.dataset.bound = '1';
-            upload.addEventListener('click', () => fileInput.click());
-            fileInput.addEventListener('change', () => { const file = fileInput.files?.[0]; if (fileName) fileName.textContent = file ? `已添加：${file.name}` : '支持图片、PDF、Word；文字素材仍需填写'; });
-        }
         updateCount();
     }
 
-    function renderSocialPreview() {
-        const input = document.getElementById('socialInput'), preview = document.getElementById('socialPreview'), status = document.querySelector('.social-output-status'), score = document.getElementById('socialCheckScore');
-        const text = (input && input.value.trim()) || '把你的素材整理成一段真实、具体、愿意被分享的内容。';
-        const title = text.replace(/[。！？!?].*$/, '').slice(0, 24) || '今天想分享的一件小事';
-        const requirements = document.getElementById('socialRequirements')?.value.trim();
-        const body = `${text}${requirements ? `\n\n补充要求：${requirements}` : ''}\n\n把重点说清楚，也把自己的体验留下来。读者能快速知道发生了什么、为什么值得看，以及可以从中得到什么。`;
+    async function renderSocialPreview() {
+        const input = document.getElementById('socialInput');
+        const preview = document.getElementById('socialPreview');
+        const status = document.querySelector('.social-output-status');
+        const generate = document.getElementById('socialGenerateBtn');
+        const hint = document.getElementById('socialGenerateHint');
+        const material = input?.value.trim() || '';
+        if (material.replace(/\s/g, '').length < 6 || !preview || !generate) return;
+
         const activePlatform = document.querySelector('.social-platform.is-active');
+        const platform = activePlatform?.dataset.platform || 'xiaohongshu';
         const platformLabel = activePlatform?.querySelector('b')?.textContent?.trim() || '小红书';
         const goal = document.querySelector('.social-goal.is-active')?.dataset.goal || '产品推荐';
-        const escapeHtml = value => String(value).replace(/[&<>"']/g, char => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));
-        if (preview) preview.innerHTML = `<div class="social-preview-content"><span class="social-preview-platform">${escapeHtml(platformLabel)} · ${escapeHtml(goal)}</span><h4>${escapeHtml(title)}</h4><p>${escapeHtml(body).replace(/\n/g, '<br>')}</p><div class="social-preview-tags">#真实分享　#经验记录　#生活灵感</div><div class="social-comment">评论引导：你也遇到过类似情况吗？</div><button class="social-copy-btn" onclick="window._copySocialPreview()"><i class="fas fa-copy"></i> 复制内容</button></div>`;
-        if (status) status.innerHTML = '<i class="fas fa-circle"></i> 已生成预览';
-        if (score) score.textContent = '4 项通过';
+        const requirements = document.getElementById('socialRequirements')?.value.trim() || '';
+        const previousButtonHtml = generate.innerHTML;
+
+        generate.disabled = true;
+        generate.setAttribute('aria-busy', 'true');
+        generate.innerHTML = '<i class="fas fa-circle-notch fa-spin"></i><span>正在生成</span>';
+        if (hint) hint.textContent = '正在整理素材并生成内容';
+        if (status) status.innerHTML = '<i class="fas fa-circle-notch fa-spin"></i> 生成中';
+        preview.innerHTML = '<div class="social-preview-empty social-preview-loading"><div class="social-loading-lines" aria-hidden="true"><span></span><span></span><span></span><span></span></div><strong>正在生成内容</strong><span>将按所选平台调整结构和语气</span></div>';
+
+        try {
+            const response = await api.generateSocialContent({ platform, goal, material, requirements });
+            const content = response?.data?.content || '';
+            if (!content) throw new Error('生成结果为空');
+
+            const wrapper = document.createElement('div');
+            wrapper.className = 'social-preview-content';
+            const meta = document.createElement('span');
+            meta.className = 'social-preview-platform';
+            meta.textContent = `${platformLabel} / ${goal}`;
+            const body = document.createElement('div');
+            body.className = 'social-preview-body markdown-body';
+            body.innerHTML = utils.renderMarkdown(content);
+            const copy = document.createElement('button');
+            copy.type = 'button';
+            copy.className = 'social-copy-btn';
+            copy.innerHTML = '<i class="fas fa-copy"></i> 复制内容';
+            copy.addEventListener('click', window._copySocialPreview);
+            wrapper.append(meta, body, copy);
+            preview.replaceChildren(wrapper);
+            preview.dataset.generatedContent = content;
+            if (status) status.innerHTML = '<i class="fas fa-check"></i> 已生成';
+            if (hint) hint.textContent = '内容已生成，可继续修改素材后重新生成';
+        } catch (error) {
+            preview.innerHTML = '<div class="social-preview-empty social-preview-error"><div class="social-empty-icon"><i class="fas fa-triangle-exclamation"></i></div><strong>生成失败</strong><span></span></div>';
+            const message = preview.querySelector('.social-preview-error span');
+            if (message) message.textContent = error.message || '请稍后重试';
+            if (status) status.innerHTML = '<i class="fas fa-triangle-exclamation"></i> 生成失败';
+            if (hint) hint.textContent = '生成失败，可检查登录状态或稍后重试';
+            utils.showToast(error.message || '生成失败，请稍后重试', 'error');
+        } finally {
+            generate.removeAttribute('aria-busy');
+            generate.innerHTML = previousButtonHtml;
+            generate.disabled = (input?.value || '').replace(/\s/g, '').length < 6;
+        }
     }
-    window._copySocialPreview = function () { const content = document.querySelector('.social-preview-content'); if (!content) return; navigator.clipboard?.writeText(content.innerText).then(() => utils.showToast('内容已复制', 'success')).catch(() => utils.showToast('复制失败，请手动选择', 'warning')); };
+    window._copySocialPreview = function () { const preview = document.getElementById('socialPreview'); const content = preview?.dataset.generatedContent; if (!content) return; navigator.clipboard?.writeText(content).then(() => utils.showToast('内容已复制', 'success')).catch(() => utils.showToast('复制失败，请手动选择', 'warning')); };
 
     function outsideClickHandler(e) {
         const panel   = document.getElementById('wrtFieldPanel');

@@ -135,6 +135,100 @@ const utils = {
         return div.innerHTML;
     },
 
+    // 安全渲染模型返回的 Markdown。先转义原始 HTML，再解析常用块级与行内语法。
+    renderMarkdown(markdown) {
+        const source = String(markdown || '').replace(/\r\n?/g, '\n');
+        const escape = value => this.escapeHtml(String(value || ''));
+        const inline = value => {
+            const codeTokens = [];
+            let text = escape(value).replace(/`([^`]+)`/g, (_, code) => {
+                const token = `\u0000CODE${codeTokens.length}\u0000`;
+                codeTokens.push(`<code>${code}</code>`);
+                return token;
+            });
+            text = text.replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/gi, (_, label, url) =>
+                `<a href="${escape(url)}" target="_blank" rel="noopener noreferrer">${label}</a>`);
+            text = text
+                .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
+                .replace(/__([^_]+)__/g, '<strong>$1</strong>')
+                .replace(/~~([^~]+)~~/g, '<del>$1</del>')
+                .replace(/(^|[^*])\*([^*\n]+)\*(?!\*)/g, '$1<em>$2</em>')
+                .replace(/(^|[^_])_([^_\n]+)_(?!_)/g, '$1<em>$2</em>');
+            return text.replace(/\u0000CODE(\d+)\u0000/g, (_, index) => codeTokens[Number(index)] || '');
+        };
+        const lines = source.split('\n');
+        const html = [];
+        let paragraph = [];
+        let listType = '';
+        let quote = [];
+        const flushParagraph = () => {
+            if (!paragraph.length) return;
+            html.push(`<p>${paragraph.map(inline).join('<br>')}</p>`);
+            paragraph = [];
+        };
+        const closeList = () => {
+            if (!listType) return;
+            html.push(`</${listType}>`);
+            listType = '';
+        };
+        const flushQuote = () => {
+            if (!quote.length) return;
+            html.push(`<blockquote>${quote.map(inline).join('<br>')}</blockquote>`);
+            quote = [];
+        };
+
+        for (let index = 0; index < lines.length; index += 1) {
+            const line = lines[index];
+            const fence = line.match(/^\s*```([^`]*)$/);
+            if (fence) {
+                flushParagraph(); closeList(); flushQuote();
+                const code = [];
+                index += 1;
+                while (index < lines.length && !/^\s*```\s*$/.test(lines[index])) {
+                    code.push(lines[index]); index += 1;
+                }
+                const language = fence[1].trim().replace(/[^a-z0-9_-]/gi, '');
+                html.push(`<pre><code${language ? ` class="language-${language}"` : ''}>${escape(code.join('\n'))}</code></pre>`);
+                continue;
+            }
+            if (!line.trim()) {
+                flushParagraph(); closeList(); flushQuote();
+                continue;
+            }
+            const heading = line.match(/^(#{1,6})\s+(.+)$/);
+            if (heading) {
+                flushParagraph(); closeList(); flushQuote();
+                const level = heading[1].length;
+                html.push(`<h${level}>${inline(heading[2])}</h${level}>`);
+                continue;
+            }
+            if (/^\s*([-*_])(?:\s*\1){2,}\s*$/.test(line)) {
+                flushParagraph(); closeList(); flushQuote(); html.push('<hr>');
+                continue;
+            }
+            const quoteLine = line.match(/^\s*>\s?(.*)$/);
+            if (quoteLine) {
+                flushParagraph(); closeList(); quote.push(quoteLine[1]);
+                continue;
+            }
+            flushQuote();
+            const unordered = line.match(/^\s*[-+*]\s+(.+)$/);
+            const ordered = line.match(/^\s*\d+[.)]\s+(.+)$/);
+            if (unordered || ordered) {
+                flushParagraph();
+                const nextType = ordered ? 'ol' : 'ul';
+                if (listType && listType !== nextType) closeList();
+                if (!listType) { listType = nextType; html.push(`<${listType}>`); }
+                html.push(`<li>${inline((unordered || ordered)[1])}</li>`);
+                continue;
+            }
+            closeList();
+            paragraph.push(line);
+        }
+        flushParagraph(); closeList(); flushQuote();
+        return html.join('');
+    },
+
     // 获取URL参数
     getUrlParam(name) {
         const urlParams = new URLSearchParams(window.location.search);

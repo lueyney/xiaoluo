@@ -355,7 +355,7 @@
               + '<span style="font-size:11px;color:rgba(255,255,255,.25);margin-left:auto">' + (content.length||0) + ' \u5b57\u7b26</span>'
             + '</div>'
             + '<div class="lib-viewer-body">'
-              + (content ? '<div class="lib-viewer-content">' + utils.escapeHtml(content) + '</div>' : '<div style="text-align:center;padding:60px 20px;color:rgba(255,255,255,.3);font-size:14px">\u6682\u65e0\u5185\u5bb9</div>')
+              + (content ? '<div class="lib-viewer-content markdown-body">' + utils.renderMarkdown(content) + '</div>' : '<div style="text-align:center;padding:60px 20px;color:rgba(255,255,255,.3);font-size:14px">\u6682\u65e0\u5185\u5bb9</div>')
             + '</div>'
             + '</div>';
         document.body.appendChild(overlay);

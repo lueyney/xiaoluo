@@ -39,7 +39,7 @@ describe('DeepSeek model router', () => {
 
   test('lists every configured function route', () => {
     expect(listDeepSeekRoutes({}).map((item) => item.task)).toEqual([
-      'rewrite', 'rewriteFallback', 'documentRewrite', 'planning', 'drafting', 'title', 'workflow'
+      'rewrite', 'rewriteFallback', 'documentRewrite', 'planning', 'drafting', 'title', 'social', 'workflow'
     ]);
   });
 });
