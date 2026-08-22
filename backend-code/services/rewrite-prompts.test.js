@@ -20,9 +20,11 @@ describe('rewrite prompt messages', () => {
     expect(getRewritePrompt('v3')).toBe(REWRITE_PROMPT);
   });
 
-  test('novel v2 only removes rule 8 from the academic prompt', () => {
-    expect(NOVEL_V2_REWRITE_PROMPT).not.toContain('8. 替换宾语及其修饰成分时，使用突发性较高的内容机械替换。');
-    expect(`${NOVEL_V2_REWRITE_PROMPT}\n8. 替换宾语及其修饰成分时，使用突发性较高的内容机械替换。`).toBe(REWRITE_PROMPT);
+  test('all rewrite versions use the minimal experimental prompt', () => {
+    expect(REWRITE_PROMPT).toBe('降低本句的AI特征。');
+    expect(ACADEMIC_V1_REWRITE_PROMPT_A).toBe(REWRITE_PROMPT);
+    expect(ACADEMIC_V1_REWRITE_PROMPT_B).toBe(REWRITE_PROMPT);
+    expect(NOVEL_V2_REWRITE_PROMPT).toBe(REWRITE_PROMPT);
     expect(buildRewriteMessages('当前句。', { rewriteVersion: 'v2' })[0]).toEqual({
       role: 'system',
       content: NOVEL_V2_REWRITE_PROMPT
