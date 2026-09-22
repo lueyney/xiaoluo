@@ -515,14 +515,13 @@ async function rewriteSentences(sentences, {
   let fatalError = null;
   const settledTaskIndexes = new Set();
 
-  const academicAlternation = normalizeRewriteVersion(rewriteVersion) === 'v1';
   for (let idx = 0; idx < sentences.length; idx++) {
     if (!shouldRewriteSentence(sentences[idx])) continue;
     tasks.push({
       idx,
       sentObj: sentences[idx],
       sourceIndex: Number.isInteger(sentences[idx].sourceIndex) ? sentences[idx].sourceIndex : idx,
-      promptVariant: academicAlternation ? academicPromptVariantForIndex(tasks.length) : null
+      promptVariant: academicPromptVariantForIndex()
     });
   }
   const groups = groupRewriteTasks(tasks, REWRITE_GROUP_SIZE);
@@ -657,6 +656,7 @@ async function rewriteSentences(sentences, {
             sentenceIndex: idx,
             groupIndex,
             groupPosition,
+            promptVariant,
             contextCount: context.previousRewrittenSentences.length
           }
         });
@@ -702,6 +702,7 @@ async function rewriteSentences(sentences, {
             sentenceIndex: idx,
             groupIndex,
             groupPosition,
+            promptVariant,
             contextCount: context.previousRewrittenSentences.length
           }
         });

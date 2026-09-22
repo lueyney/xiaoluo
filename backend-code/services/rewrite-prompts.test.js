@@ -13,33 +13,28 @@ const {
 } = require('./rewrite-prompts');
 
 describe('rewrite prompt messages', () => {
-  test('all legacy versions and variants resolve to the single best prompt', () => {
-    expect(BEST_REWRITE_PROMPT).toBe(REWRITE_PROMPT);
-    expect(ACADEMIC_V1_REWRITE_PROMPT_A).toBe(REWRITE_PROMPT);
-    expect(getRewritePrompt('v1', { promptVariant: 'A' })).toBe(REWRITE_PROMPT);
-    expect(getRewritePrompt('v1', { promptVariant: 'B' })).toBe(REWRITE_PROMPT);
-    expect(getRewritePrompt('v1', { promptVariant: 'C' })).toBe(REWRITE_PROMPT);
-    expect(getRewritePrompt('v2')).toBe(REWRITE_PROMPT);
-    expect(getRewritePrompt('v3')).toBe(REWRITE_PROMPT);
+  test('A/B/C variants resolve to their own prompts and legacy defaults remain compatible', () => {
+    expect(BEST_REWRITE_PROMPT).toBe(ACADEMIC_V1_REWRITE_PROMPT_A);
+    expect(ACADEMIC_V1_REWRITE_PROMPT_A).not.toBe(ACADEMIC_V1_REWRITE_PROMPT_B);
+    expect(ACADEMIC_V1_REWRITE_PROMPT_B).not.toBe(ACADEMIC_V1_REWRITE_PROMPT_C);
+    expect(ACADEMIC_V1_REWRITE_PROMPT_A).not.toBe(ACADEMIC_V1_REWRITE_PROMPT_C);
+    expect(getRewritePrompt('v1', { promptVariant: 'A' })).toBe(ACADEMIC_V1_REWRITE_PROMPT_A);
+    expect(getRewritePrompt('v1', { promptVariant: 'B' })).toBe(ACADEMIC_V1_REWRITE_PROMPT_B);
+    expect(getRewritePrompt('v1', { promptVariant: 'C' })).toBe(ACADEMIC_V1_REWRITE_PROMPT_C);
+    expect(getRewritePrompt('v2')).toBe(ACADEMIC_V1_REWRITE_PROMPT_A);
+    expect(getRewritePrompt('v3')).toBe(ACADEMIC_V1_REWRITE_PROMPT_A);
   });
 
   test('the shared prompt is the required low-AIGC prompt', () => {
-    expect(REWRITE_PROMPT).toContain('角色：擅长输出低AI特征的降重大师。');
-    expect(REWRITE_PROMPT).toContain('目的：降低AIGC率。');
-    expect(REWRITE_PROMPT).toContain('方法：用新的表达，根据原文实际情况重构谓语和分句结构');
-    expect(REWRITE_PROMPT).toContain('1. 改变句式和表达方式');
-    expect(REWRITE_PROMPT).toContain('2. 将抽象内容具体，减少抽象名词，删可推断的重复主语、承前宾语、指代词');
-    expect(REWRITE_PROMPT).toContain('8. 把复合连接词，替换为朴素的常见的基础连词');
-    expect(REWRITE_PROMPT).toContain('9. 宾语概念的泛化或偏离');
-    expect(REWRITE_PROMPT).toContain('所有规则尽量避开意群自然边界。');
-    expect(REWRITE_PROMPT).toContain('a.和原文语气是否一致，是否口语化？');
-    expect(REWRITE_PROMPT).toContain('b.和原文比是否AI特征降低？是否更符合人写的细腻文笔？');
-    expect(REWRITE_PROMPT).toContain('c.相邻句是否类似？');
-    expect(REWRITE_PROMPT).toContain('是则修改。');
-    expect(ACADEMIC_V1_REWRITE_PROMPT_A).toBe(REWRITE_PROMPT);
-    expect(ACADEMIC_V1_REWRITE_PROMPT_B).toBe(REWRITE_PROMPT);
-    expect(ACADEMIC_V1_REWRITE_PROMPT_C).toBe(REWRITE_PROMPT);
-    expect(NOVEL_V2_REWRITE_PROMPT).toBe(REWRITE_PROMPT);
+    for (const prompt of [ACADEMIC_V1_REWRITE_PROMPT_A, ACADEMIC_V1_REWRITE_PROMPT_B, ACADEMIC_V1_REWRITE_PROMPT_C]) {
+      expect(prompt).toContain('你是中文改写编辑。改写用户提供的文本，唯一目标是降低AIGC检测率。');
+      expect(prompt).toContain('意思不变，不增删信息');
+      expect(prompt).toContain('只输出改写后的正文。');
+    }
+    expect(ACADEMIC_V1_REWRITE_PROMPT_A).toContain('【本方案重点：句式重构】');
+    expect(ACADEMIC_V1_REWRITE_PROMPT_B).toContain('【本方案重点：节奏重组】');
+    expect(ACADEMIC_V1_REWRITE_PROMPT_C).toContain('【本方案重点：具体化】');
+    expect(NOVEL_V2_REWRITE_PROMPT).toBe(ACADEMIC_V1_REWRITE_PROMPT_A);
     expect(buildRewriteMessages('当前句。', { rewriteVersion: 'v2' })[0]).toEqual({
       role: 'system',
       content: NOVEL_V2_REWRITE_PROMPT
@@ -48,7 +43,7 @@ describe('rewrite prompt messages', () => {
 
   test('prompt is sent in system content and user content contains only input', () => {
     expect(buildRewriteMessages('当前句。')).toEqual([
-      { role: 'system', content: REWRITE_PROMPT },
+      { role: 'system', content: ACADEMIC_V1_REWRITE_PROMPT_A },
       { role: 'user', content: '处理括号中的文本，仅返回降AI结果：【当前句。】' }
     ]);
   });
@@ -58,7 +53,7 @@ describe('rewrite prompt messages', () => {
       previousSentence: '上一句。',
       nextSentence: '下一句。'
     });
-    expect(messages[0].content).toBe(REWRITE_PROMPT);
+    expect(messages[0].content).toBe(ACADEMIC_V1_REWRITE_PROMPT_A);
     expect(messages[1].content).toBe('处理括号中的文本，仅返回降AI结果：【当前句。】');
     expect(messages[1].content).not.toContain('上一句。');
   });
@@ -67,7 +62,7 @@ describe('rewrite prompt messages', () => {
     const messages = buildRewriteMessages('当前句。', {
       previousRewrittenSentence: '上一句降AI结果。'
     });
-    expect(messages[0].content).toBe(REWRITE_PROMPT);
+    expect(messages[0].content).toBe(ACADEMIC_V1_REWRITE_PROMPT_A);
     expect(messages[1].content).toBe(
       '上一句：【上一句降AI结果。】\n降重后禁止与上两句的句式和表达方式一致。\n处理括号中的文本，仅返回降AI结果：【当前句。】'
     );
@@ -88,7 +83,7 @@ describe('rewrite prompt messages', () => {
       batchTexts: ['第一句。', '第二句。'],
       previousRewrittenSentences: ['前句一。', '前句二。']
     });
-    expect(messages[0]).toEqual({ role: 'system', content: REWRITE_PROMPT });
+    expect(messages[0]).toEqual({ role: 'system', content: ACADEMIC_V1_REWRITE_PROMPT_A });
     expect(messages[1].content).toContain('上两句：【前句一。】\n上一句：【前句二。】');
     expect(messages[1].content).toContain('严格输出2行');
     expect(messages[1].content).toContain('相邻句要有不同的句式和开头');
@@ -99,14 +94,23 @@ describe('rewrite prompt messages', () => {
     expect(buildRewritePrompt('当前句。')).toBe('处理括号中的文本，仅返回降AI结果：【当前句。】');
   });
 
-  test('cycles effective sentence slots through A, B and C', () => {
-    expect([0, 1, 2, 3, 4, 5].map(academicPromptVariantForIndex))
-      .toEqual(['A', 'B', 'C', 'A', 'B', 'C']);
+  test('chooses A/B/C randomly', () => {
+    const originalRandom = Math.random;
+    try {
+      Math.random = () => 0;
+      expect(academicPromptVariantForIndex()).toBe('A');
+      Math.random = () => 0.34;
+      expect(academicPromptVariantForIndex()).toBe('B');
+      Math.random = () => 0.99;
+      expect(academicPromptVariantForIndex()).toBe('C');
+    } finally {
+      Math.random = originalRandom;
+    }
   });
 
   test('unspecified prompt variant remains compatible with prompt A', () => {
-    expect(getRewritePrompt('v1')).toBe(REWRITE_PROMPT);
-    expect(getRewritePrompt('v1', {})).toBe(REWRITE_PROMPT);
+    expect(getRewritePrompt('v1')).toBe(ACADEMIC_V1_REWRITE_PROMPT_A);
+    expect(getRewritePrompt('v1', {})).toBe(ACADEMIC_V1_REWRITE_PROMPT_A);
   });
 
   test('B slot also places its prompt in user content', () => {

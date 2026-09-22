@@ -211,6 +211,7 @@ function auditRewriteRequest(payload, details = {}) {
     sentenceIndex: details.sentenceIndex,
     groupIndex: details.groupIndex,
     groupPosition: details.groupPosition,
+    promptVariant: details.promptVariant || null,
     contextCount: details.contextCount || 0,
     contextSource: details.contextCount ? 'rewritten_results' : 'none',
     model: payload.model,
