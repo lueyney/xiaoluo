@@ -24,16 +24,18 @@ describe('rewrite prompt messages', () => {
   });
 
   test('the shared prompt is the required low-AIGC prompt', () => {
-    expect(REWRITE_PROMPT).toContain('角色：低AI特征逐句改写。单位是句，不跨句合并');
-    expect(REWRITE_PROMPT).toContain('专业术语密度不得低于原文。');
-    expect(REWRITE_PROMPT).toContain('【改写规则 1-9（逐句应用，不必全用）】');
-    expect(REWRITE_PROMPT).toContain('1. 句式转换');
-    expect(REWRITE_PROMPT).toContain('8. 复合连接词换基础连词');
-    expect(REWRITE_PROMPT).toContain('9. 【原「宾语泛化」改向】宾语走侧移或下移，不走泛化');
-    expect(REWRITE_PROMPT).toContain('【新增算子 A-D】');
-    expect(REWRITE_PROMPT).toContain('· 每句至少选 2-3 个算子，不得全用。');
-    expect(REWRITE_PROMPT).toContain('· 相邻两句主算子必须不同。');
-    expect(REWRITE_PROMPT).toContain('有没有丢信息？任一命中则重改该句。');
+    expect(REWRITE_PROMPT).toContain('角色：擅长输出低AI特征的降重大师。');
+    expect(REWRITE_PROMPT).toContain('目的：降低AIGC率。');
+    expect(REWRITE_PROMPT).toContain('方法：用新的表达，根据原文实际情况重构谓语和分句结构');
+    expect(REWRITE_PROMPT).toContain('1. 改变句式和表达方式');
+    expect(REWRITE_PROMPT).toContain('2. 将抽象内容具体，减少抽象名词，删可推断的重复主语、承前宾语、指代词');
+    expect(REWRITE_PROMPT).toContain('8. 把复合连接词，替换为朴素的常见的基础连词');
+    expect(REWRITE_PROMPT).toContain('9. 宾语概念的泛化或偏离');
+    expect(REWRITE_PROMPT).toContain('所有规则尽量避开意群自然边界。');
+    expect(REWRITE_PROMPT).toContain('a.和原文语气是否一致，是否口语化？');
+    expect(REWRITE_PROMPT).toContain('b.和原文比是否AI特征降低？是否更符合人写的细腻文笔？');
+    expect(REWRITE_PROMPT).toContain('c.相邻句是否类似？');
+    expect(REWRITE_PROMPT).toContain('是则修改。');
     expect(ACADEMIC_V1_REWRITE_PROMPT_A).toBe(REWRITE_PROMPT);
     expect(ACADEMIC_V1_REWRITE_PROMPT_B).toBe(REWRITE_PROMPT);
     expect(ACADEMIC_V1_REWRITE_PROMPT_C).toBe(REWRITE_PROMPT);
