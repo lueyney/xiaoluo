@@ -15,6 +15,17 @@
     var JOB_STORAGE_KEY = 'document_rewrite_job_id';
     var MAX_UPLOAD_BYTES = 80 * 1024 * 1024;
     var lastRenderedResultsSignature = '';
+    var localModePromise = null;
+
+    function isLocalRewriteMode() {
+        if (!localModePromise) {
+            localModePromise = fetch(resolveApiUrl('/rewrite/mode'), { cache: 'no-store' })
+                .then(function (response) { return response.ok ? response.json() : null; })
+                .then(function (payload) { return !!(payload && payload.data && payload.data.localTestMode); })
+                .catch(function () { return false; });
+        }
+        return localModePromise;
+    }
 
     function escapeHtml(value) {
         return String(value == null ? '' : value)
@@ -67,6 +78,16 @@
             throw new Error('服务器返回的不是有效 Word 文档');
         }
         return blob;
+    }
+
+    function fileNameFromDisposition(value) {
+        var header = String(value || '');
+        var utf8 = header.match(/filename\*\s*=\s*UTF-8''([^;]+)/i);
+        if (utf8 && utf8[1]) {
+            try { return decodeURIComponent(utf8[1].trim().replace(/^"|"$/g, '')).replace(/[\\/]/g, '_'); } catch (_) { /* use basic filename */ }
+        }
+        var basic = header.match(/filename\s*=\s*"([^"]+)"/i) || header.match(/filename\s*=\s*([^;]+)/i);
+        return basic && basic[1] ? basic[1].trim().replace(/^"|"$/g, '').replace(/[\\/]/g, '_') : '';
     }
 
     function resetStartButton(label) {
@@ -348,7 +369,8 @@
     function updateProgress(payload) {
         payload = payload || {};
         var progress = payload.progress || payload.data && payload.data.progress || {};
-        var value = Number(payload.percent != null ? payload.percent : progress.percent);
+        var reviewRequired = String(payload.status || '').toLowerCase() === 'review_required';
+        var value = reviewRequired ? 0 : Number(payload.percent != null ? payload.percent : progress.percent);
         if (!Number.isFinite(value)) {
             var completed = Number(progress.completed != null ? progress.completed : payload.completed);
             var total = Number(progress.total != null ? progress.total : payload.total);
@@ -358,8 +380,11 @@
         var bar = document.getElementById('docRewriteProgressBar');
         var pct = document.getElementById('docRewritePercent');
         var status = document.getElementById('docRewriteStatusText');
-        if (bar) bar.style.width = value.toFixed(1) + '%';
-        if (pct) pct.textContent = Math.round(value) + '%';
+        if (bar) {
+            bar.style.width = value.toFixed(1) + '%';
+            bar.classList.toggle('is-review-required', reviewRequired);
+        }
+        if (pct) pct.textContent = reviewRequired ? '—' : (Math.round(value) + '%');
         if (status) status.textContent = payload.message || progress.message || (payload.reportMatch && payload.reportMatch.fallback ? '检测报告未识别，正在进行全文降重……' : (payload.status === 'completed' ? '文档降重已完成' : '正在处理文档……'));
         updateResults(payload);
         updateFullResult(payload);
@@ -367,6 +392,11 @@
 
     async function startJob() {
         if (!state.file || state.processing) return;
+        if (state.pollTimer) clearTimeout(state.pollTimer);
+        state.pollTimer = null;
+        state.jobId = null;
+        state.lastStatus = null;
+        rememberJob();
         state.processing = true;
         state.pollDelayMs = 3000;
         state.pollFailures = 0;
@@ -403,6 +433,8 @@
             if (state.pollTimer) clearTimeout(state.pollTimer);
             state.pollTimer = null;
             state.jobId = null;
+            state.lastStatus = null;
+            rememberJob();
             resetStartButton('开始文档降重');
             notify(error.message || '文档任务提交失败', 'error');
         }
@@ -463,15 +495,20 @@
                 var start = document.getElementById('docRewriteStart');
                 var download = document.getElementById('docRewriteDownload');
                 if (start) start.disabled = false;
-                if (download) download.hidden = !(data.downloadReady === true || data.downloadUrl);
-                notify('文档降重已完成，可下载结果', 'success');
+                if (download) download.hidden = data.downloadReady !== true;
+                notify(data.downloadReady === true ? '文档降重已完成，可下载结果' : '文档处理已结束，但结果文件不可下载', data.downloadReady === true ? 'success' : 'warning');
                 return;
             }
             if (['failed', 'error', 'cancelled', 'canceled'].includes(status)) {
                 resetStartButton('重新开始');
                 var retry = document.getElementById('docRewriteStart');
+                var failedDownload = document.getElementById('docRewriteDownload');
+                var failedStatus = document.getElementById('docRewriteStatusText');
                 if (retry) retry.disabled = false;
-                notify(data.error || data.message || '文档降重失败', 'error');
+                if (failedDownload) failedDownload.hidden = true;
+                var failedMessage = data.error || data.message || data.progress && data.progress.message || '文档降重失败';
+                if (failedStatus) failedStatus.textContent = failedMessage;
+                notify(failedMessage, 'error');
                 return;
             }
             schedulePoll(3000);
@@ -499,9 +536,28 @@
 
     async function downloadResult() {
         if (!state.jobId) return;
+        var jobId = String(state.jobId);
         try {
-            var data = state.lastStatus || {};
-            var endpoint = data.downloadUrl || ('/document-rewrite-jobs/' + encodeURIComponent(state.jobId) + '/download');
+            var statusResponse = await fetch(resolveApiUrl('/document-rewrite-jobs/' + encodeURIComponent(jobId)), {
+                headers: authHeaders(),
+                cache: 'no-store'
+            });
+            var statusPayload = await statusResponse.json().catch(function () { return {}; });
+            if (statusResponse.status === 401) {
+                handleUnauthorized();
+                return;
+            }
+            if (!statusResponse.ok) throw new Error(statusPayload.error || statusPayload.message || '无法确认当前任务状态');
+            var data = statusPayload.data || statusPayload;
+            var responseJobId = String(data.jobId || data.id || '');
+            if (!responseJobId || responseJobId !== jobId || String(state.jobId || '') !== jobId) {
+                throw new Error('当前任务已切换，请重新确认后下载');
+            }
+            if (String(data.status || '').toLowerCase() !== 'completed' || data.downloadReady !== true) {
+                throw new Error(data.error || data.progress && data.progress.message || '当前文档尚未生成可下载结果');
+            }
+            state.lastStatus = data;
+            var endpoint = '/document-rewrite-jobs/' + encodeURIComponent(jobId) + '/download';
             var response = await fetch(resolveApiUrl(endpoint), {
                 headers: { ...authHeaders(), 'Accept': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' },
                 cache: 'no-store'
@@ -518,12 +574,13 @@
             var url = URL.createObjectURL(blob);
             var anchor = document.createElement('a');
             anchor.href = url;
-            var serverFileName = String(data.fileName || '').trim();
+            var serverFileName = fileNameFromDisposition(response.headers.get('Content-Disposition')) || String(data.fileName || '').trim();
             anchor.download = serverFileName || (((state.file && state.file.name) || 'document').replace(/\.docx$/i, '') + '_降重.docx');
             document.body.appendChild(anchor);
             anchor.click();
             anchor.remove();
             setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
+            notify('已下载：' + anchor.download, 'success');
         } catch (error) {
             notify(error.message || '下载失败', 'error');
         }
@@ -560,8 +617,9 @@
         });
     }
 
-    router.register('document-rewrite', function () {
-        if (!auth.isLoggedIn()) {
+    router.register('document-rewrite', async function () {
+        var localTestMode = await isLocalRewriteMode();
+        if (!auth.isLoggedIn() && !localTestMode) {
             notify('请先登录后再使用文档降重', 'warning');
             router.navigate('writing', true);
             setTimeout(function () { if (window.auth) auth.showAuthModal(); }, 0);

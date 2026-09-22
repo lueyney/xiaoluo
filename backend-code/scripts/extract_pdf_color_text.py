@@ -1,21 +1,50 @@
 import json
+import colorsys
 import sys
 
 import pdfplumber
 
 
-def color_kind(char):
-    color = char.get("non_stroking_color")
-    if not isinstance(color, (list, tuple)) or len(color) < 3:
+def color_to_rgb(color):
+    if not isinstance(color, (list, tuple)) or not color:
         return None
-    red, green, blue = color[:3]
-    # The reports currently use RGB(234, 0, 46) for severe suspicion and a
-    # separate amber RGB for mild suspicion. Keep this deliberately broad so
-    # nearby report themes and anti-aliased export values are accepted.
+    try:
+        channels = [float(value) for value in color]
+    except (TypeError, ValueError):
+        return None
+    scale = 255.0 if max(abs(value) for value in channels) > 1.0 else 1.0
+    channels = [max(0.0, min(1.0, value / scale)) for value in channels]
+    if len(channels) == 1:
+        return (channels[0], channels[0], channels[0])
+    if len(channels) >= 4:
+        cyan, magenta, yellow, black = channels[:4]
+        return (
+            1.0 - min(1.0, cyan + black),
+            1.0 - min(1.0, magenta + black),
+            1.0 - min(1.0, yellow + black),
+        )
+    if len(channels) >= 3:
+        return tuple(channels[:3])
+    return None
+
+
+def color_kind(char):
+    rgb = color_to_rgb(char.get("non_stroking_color"))
+    if not rgb:
+        return None
+    red, green, blue = rgb
+    # Preserve the historic severity split for red and amber reports.
     if red >= 0.80 and green <= 0.12 and blue <= 0.28:
         return "red"
     if red >= 0.80 and 0.45 <= green <= 0.90 and blue <= 0.65:
         return "yellow"
+    # Other vendors use blue, green or purple text fills for the same marked
+    # passages. Treat any clearly chromatic, visible text fill as a rewrite
+    # marker while excluding black/gray body text and near-white reverse text.
+    _hue, saturation, value = colorsys.rgb_to_hsv(red, green, blue)
+    chroma = max(rgb) - min(rgb)
+    if saturation >= 0.45 and value >= 0.35 and chroma >= 0.20:
+        return "red"
     return None
 
 

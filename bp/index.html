@@ -1,0 +1,11 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>小珞 AI｜融资 BP</title>
+<style>
+*{box-sizing:border-box}html,body{margin:0;background:#d9d9d4;overflow:hidden}#deck{width:100vw;height:100vh;position:relative}iframe{border:0;width:100%;height:100%;display:block;background:#f5f4f0}button{position:fixed;z-index:10;top:50%;width:44px;height:44px;border:1px solid #9da29e;background:#f5f4f0cc;color:#20262b;border-radius:50%;font-size:20px;cursor:pointer;opacity:.15;transition:opacity .2s}button:hover{opacity:1}#prev{left:20px}#next{right:20px}#counter{position:fixed;z-index:10;left:50%;bottom:18px;transform:translateX(-50%);font:11px Arial,sans-serif;letter-spacing:.14em;color:#6f7776;background:#f5f4f0dd;padding:7px 12px;border-radius:20px}#hint{position:fixed;z-index:10;right:24px;top:18px;font:10px Arial,sans-serif;letter-spacing:.12em;color:#7e8582}@media print{button,#counter,#hint{display:none}iframe{height:100vh;break-after:page}}
+</style>
+</head><body><main id="deck"><iframe id="frame" title="小珞 AI 融资 BP"></iframe></main><button id="prev" aria-label="上一页">‹</button><button id="next" aria-label="下一页">›</button><div id="counter"></div><div id="hint">← → / SPACE</div>
+<script>
+const slides=['01-cover','02-thesis','03-market','04-product','05-tech','06-zhuque','07-moat','08-traction','09-business','10-ask'];let index=0;const frame=document.getElementById('frame'),counter=document.getElementById('counter');function render(){frame.src='slides/'+slides[index]+'.html';counter.textContent=String(index+1).padStart(2,'0')+' / '+String(slides.length).padStart(2,'0')}function move(delta){index=(index+delta+slides.length)%slides.length;render()}document.getElementById('prev').onclick=()=>move(-1);document.getElementById('next').onclick=()=>move(1);document.addEventListener('keydown',e=>{if(['ArrowRight',' ','PageDown'].includes(e.key)){e.preventDefault();move(1)}if(['ArrowLeft','PageUp'].includes(e.key)){e.preventDefault();move(-1)}});render();
+</script></body></html>

@@ -5,7 +5,7 @@ const {
   buildRedTextStore,
   extractPdfColorText
 } = require('./pdf-aigc-report');
-const { paintedCharacters } = require('./pdf-text-layer');
+const { colorKind, paintedCharacters } = require('./pdf-text-layer');
 
 describe('pdf AIGC report matching', () => {
   test('normalizes report line breaks and page markers', () => {
@@ -134,5 +134,27 @@ describe('pdf AIGC report matching', () => {
     expect(result.redChars).toBe(2);
     expect(result.yellowChars).toBe(1);
     expect(result.characters.map((item) => item.kind)).toEqual(['red', 'yellow', 'red']);
+  });
+
+  test('treats high-saturation blue, green and purple text fills as generic markers', () => {
+    expect(colorKind([33, 150, 243])).toBe('red');
+    expect(colorKind([22, 163, 74])).toBe('red');
+    expect(colorKind([147, 51, 234])).toBe('red');
+    expect(colorKind([15, 17, 21])).toBeNull();
+    expect(colorKind([120, 126, 132])).toBeNull();
+  });
+
+  test('recognizes a blue CMYK text fill through the PDF graphics-state parser', () => {
+    const OPS = { setFillCMYKColor: 1, showText: 2 };
+    const result = paintedCharacters({ OPS }, {
+      fnArray: [OPS.setFillCMYKColor, OPS.showText],
+      argsArray: [
+        [0.85, 0.35, 0, 0],
+        [[{ unicode: '蓝色标记', width: 1000 }]]
+      ]
+    });
+
+    expect(result.redChars).toBe(1);
+    expect(result.characters.every((item) => item.kind === 'red')).toBe(true);
   });
 });

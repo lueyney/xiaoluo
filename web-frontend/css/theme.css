@@ -219,7 +219,7 @@ body.light-theme #originalText::placeholder { color:#94a3b8 !important; }
 body.light-theme #rewriteContent { background:#f7f8ff !important; color:#172033 !important; border-color:#c7d2fe !important; }
 body.light-theme #rewriteVersionTabs { background:#fff !important; border-color:#dbe3ef !important; }
 body.light-theme #rewriteVersionTabs button:not(.is-active) { background:transparent !important; color:#64748b !important; box-shadow:none !important; }
-body.light-theme #rewriteVersionTabs button:hover:not(.is-active) { background:#f8faff !important; color:var(--accent-700) !important; }
+body.light-theme #rewriteVersionTabs button:hover:not(.is-active) { background:#f0fdfa !important; color:#0f766e !important; }
 body.light-theme #rewriteVersionTabs button.is-active { background:var(--accent-600) !important; color:#fff !important; box-shadow:0 2px 7px rgba(79,70,229,.22) !important; }
 body.light-theme #rewriteVersionTabs button:focus-visible { outline:3px solid var(--accent-focus); outline-offset:1px; }
 body.light-theme .rewrite-rate-note { color:#64748b; background:#fffbeb; border-color:#fde68a; }
@@ -3934,6 +3934,7 @@ body:not(.light-theme) .orders-page .pkgcard.free-card {
   .rewrite-editor-grid { grid-template-columns:1fr !important; gap:22px !important; }
   .rewrite-toolbar { align-items:stretch !important; flex-wrap:wrap; }
   #rewriteVersionTabs { flex:1 1 100%; }
+  #rewriteVersionTabs button { flex:1 1 0; }
   .rewrite-cost-panel { min-height:46px; }
   #rewriteBtn,#cancelRewriteBtn { flex:1 1 150px; padding-right:20px !important; padding-left:20px !important; }
   .orders-wrap { padding:22px 16px 30px !important; }

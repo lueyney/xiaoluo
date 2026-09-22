@@ -12,10 +12,19 @@ const {
   normalizeRewriteVersion
 } = require('../services/rewrite-prompts');
 const {
+  normalizeRewritePlan,
+  assignFourDraftModes,
+  parseFourDraftOutput
+} = require('../services/rewrite-four-draft');
+const {
   logDeepSeekSelection
 } = require('../services/ai-model-router');
 const { getRewriteConfig, buildRewritePayload } = require('../services/rewrite-config');
-const { groupRewriteTasks, buildChainedRewriteContext } = require('../services/rewrite-groups');
+const {
+  groupRewriteTasks,
+  groupRewriteTasksByParagraph,
+  buildChainedRewriteContext
+} = require('../services/rewrite-groups');
 const {
   beginRewriteAuditRun,
   auditRewriteRequest,
@@ -39,7 +48,9 @@ router.get('/mode', (req, res) => {
         topP: rewriteConfig.topP,
         thinking: rewriteConfig.selection.thinking,
         reasoningEffort: rewriteConfig.selection.reasoningEffort || 'provider-default',
-        batchMode: REWRITE_BATCH_MODE
+        batchMode: REWRITE_BATCH_MODE,
+        plans: ['legacy', 'four-draft'],
+        defaultPlan: 'legacy'
       }
     }
   });
@@ -126,6 +137,24 @@ function createDeepSeekError(message, details = {}) {
   const error = new Error(message);
   Object.assign(error, details);
   return error;
+}
+
+function rewriteUnavailableMessage(fatalError) {
+  const status = Number(fatalError && fatalError.status);
+  const code = String(fatalError && fatalError.code || '');
+  if (status === 402) return 'AI 服务余额不足，本次未生成降重结果，请充值后重新提交';
+  if (status === 401 || status === 403) return 'AI 服务凭据无效或无权限，本次未生成降重结果';
+  if (code === 'AI_NOT_CONFIGURED') return 'AI 降重服务未配置，本次未生成降重结果';
+  return 'AI 降重服务不可用，本次未生成降重结果';
+}
+
+function throwIfAllRewriteTasksFailed(outcome) {
+  if (!outcome || !(outcome.taskCount > 0 && outcome.failedCount >= outcome.taskCount)) return;
+  throw createDeepSeekError(rewriteUnavailableMessage(outcome.fatalError), {
+    code: outcome.fatalError && outcome.fatalError.code || 'REWRITE_ALL_TASKS_FAILED',
+    status: outcome.fatalError && outcome.fatalError.status || null,
+    retryable: false
+  });
 }
 
 async function rewriteWithDeepSeek(text, onDelta, rewriteVersion = 'v1', options = {}) {
@@ -402,9 +431,14 @@ function splitSentences(text) {
   return sentences;
 }
 
-function assembleParagraphs(sentences, results) {
+function buildResultOrder(sentences, options = {}) {
+  return sentences.map((_, index) => index);
+}
+
+function assembleParagraphs(sentences, results, options = {}) {
   const paraMap = new Map();
-  for (let i = 0; i < sentences.length; i++) {
+  const resultOrder = buildResultOrder(sentences, options);
+  for (const i of resultOrder) {
     const { pIdx } = sentences[i];
     if (!paraMap.has(pIdx)) paraMap.set(pIdx, []);
     paraMap.get(pIdx).push(results[i]);
@@ -458,18 +492,6 @@ const REWRITE_MIN_CONCURRENCY = Math.min(
   REWRITE_INITIAL_CONCURRENCY,
   Math.max(1, Number.parseInt(process.env.REWRITE_GROUP_MIN_CONCURRENCY || '4', 10) || 4)
 );
-const DOCUMENT_REWRITE_CONCURRENCY = Math.min(
-  256,
-  Math.max(1, Number.parseInt(process.env.DOCUMENT_REWRITE_CONCURRENCY || '128', 10) || 128)
-);
-const DOCUMENT_REWRITE_INITIAL_CONCURRENCY = Math.min(
-  DOCUMENT_REWRITE_CONCURRENCY,
-  Math.max(1, Number.parseInt(process.env.DOCUMENT_REWRITE_INITIAL_CONCURRENCY || '32', 10) || 32)
-);
-const DOCUMENT_REWRITE_MIN_CONCURRENCY = Math.min(
-  DOCUMENT_REWRITE_INITIAL_CONCURRENCY,
-  Math.max(1, Number.parseInt(process.env.DOCUMENT_REWRITE_MIN_CONCURRENCY || '8', 10) || 8)
-);
 const REWRITE_BATCH_MODE = String(process.env.REWRITE_BATCH_MODE || 'sentence').trim().toLowerCase();
 const REWRITE_BATCH_ENABLED = REWRITE_BATCH_MODE === 'group';
 
@@ -481,39 +503,59 @@ function shouldRewriteSentence(sentObj) {
   return !sentObj.isTitle && effectiveContentLength(sentObj.text) >= 6;
 }
 
+function shouldRewriteSentenceForPlan(sentObj, rewritePlan) {
+  return !sentObj.isTitle && effectiveContentLength(sentObj.text) >= (rewritePlan === 'four-draft' ? 1 : 6);
+}
+
 async function rewriteSentences(sentences, {
   onDelta,
   onResult,
   rewriteVersion = 'v1',
+  rewritePlan = 'legacy',
+  rewriteRegister,
+  protectedTerms,
   concurrency = REWRITE_CONCURRENCY,
   adaptiveConcurrency = true,
   initialConcurrency = REWRITE_INITIAL_CONCURRENCY,
   minConcurrency = REWRITE_MIN_CONCURRENCY,
   maxRetries = adaptiveConcurrency ? DEEPSEEK_RETRY_MAX : 0
 } = {}) {
+  rewritePlan = normalizeRewritePlan(rewritePlan);
   const results = sentences.map((sentObj) => sentObj.text);
   const tasks = [];
   let failedCount = 0;
+  let successfulCount = 0;
   let retriedCount = 0;
   let fallbackCount = 0;
   let fallbackRecoveredCount = 0;
+  let fatalError = null;
+  const settledTaskIndexes = new Set();
 
-  const academicAlternation = normalizeRewriteVersion(rewriteVersion) === 'v1';
+  const academicAlternation = rewritePlan === 'legacy' && normalizeRewriteVersion(rewriteVersion) === 'v1';
+  const fourDraftModes = rewritePlan === 'four-draft' ? assignFourDraftModes(sentences) : [];
   for (let idx = 0; idx < sentences.length; idx++) {
-    if (!shouldRewriteSentence(sentences[idx])) continue;
+    if (!shouldRewriteSentenceForPlan(sentences[idx], rewritePlan)) continue;
     tasks.push({
       idx,
       sentObj: sentences[idx],
-      promptVariant: academicAlternation ? academicPromptVariantForIndex(tasks.length) : null
+      sourceIndex: Number.isInteger(sentences[idx].sourceIndex) ? sentences[idx].sourceIndex : idx,
+      promptVariant: academicAlternation ? academicPromptVariantForIndex(tasks.length) : null,
+      fourDraftMode: fourDraftModes[idx] || null,
+      fourDraftOperators: ''
     });
   }
-  const groups = groupRewriteTasks(tasks, REWRITE_GROUP_SIZE);
+  const groups = rewritePlan === 'four-draft'
+    ? groupRewriteTasksByParagraph(tasks)
+    : groupRewriteTasks(tasks, REWRITE_GROUP_SIZE);
   logger.info('AI降重任务拆分完成', {
     model: getRewriteConfig().model,
     rewriteVersion,
-    requestMode: REWRITE_BATCH_ENABLED ? 'five-sentences-per-request-experimental' : 'one-sentence-per-request',
+    rewritePlan,
+    requestMode: rewritePlan === 'four-draft'
+      ? 'one-sentence-per-request-four-draft'
+      : (REWRITE_BATCH_ENABLED ? 'five-sentences-per-request-experimental' : 'one-sentence-per-request'),
     sentenceUnits: sentences.length,
-    requestCount: REWRITE_BATCH_ENABLED ? groups.length : tasks.length,
+    requestCount: rewritePlan === 'four-draft' || !REWRITE_BATCH_ENABLED ? tasks.length : groups.length,
     skippedCount: sentences.length - tasks.length
   });
   const auditRunId = beginRewriteAuditRun({
@@ -523,10 +565,11 @@ async function rewriteSentences(sentences, {
     thinking: getRewriteConfig().selection.thinking,
     reasoningEffort: getRewriteConfig().selection.reasoningEffort || 'provider-default',
     rewriteVersion,
+    rewritePlan,
     groupSize: REWRITE_GROUP_SIZE,
     groupCount: groups.length,
     sentenceUnits: sentences.length,
-    requestCount: REWRITE_BATCH_ENABLED ? groups.length : tasks.length,
+    requestCount: rewritePlan === 'four-draft' || !REWRITE_BATCH_ENABLED ? tasks.length : groups.length,
     skippedCount: sentences.length - tasks.length
   });
 
@@ -557,9 +600,84 @@ async function rewriteSentences(sentences, {
     return Math.max(Number(error && error.retryAfterMs) || 0, exponential + jitter);
   }
 
+  function safeErrorSummary(error) {
+    if (!error) return null;
+    const status = error.status == null ? null : Number(error.status);
+    return {
+      code: error.code || 'DEEPSEEK_FATAL_ERROR',
+      status: Number.isInteger(status) ? status : null,
+      message: error.message || 'AI 降重服务不可用'
+    };
+  }
+
+  function isFatalRewriteError(error) {
+    if (!error) return false;
+    const status = Number(error.status);
+    if (Number.isInteger(status) && status >= 400 && status < 500 && !isRetryableStatus(status)) return true;
+    return ['AI_NOT_CONFIGURED', 'DOCUMENT_REWRITE_AI_NOT_CONFIGURED'].includes(String(error.code || ''));
+  }
+
+  function registerFatalError(error) {
+    if (!isFatalRewriteError(error)) return false;
+    if (!fatalError) fatalError = safeErrorSummary(error);
+    return true;
+  }
+
+  function settleTask(task, rewritten, failed, metadata = {}, error = null) {
+    if (!task || settledTaskIndexes.has(task.idx)) return false;
+    settledTaskIndexes.add(task.idx);
+    if (failed) {
+      results[task.idx] = task.sentObj.text;
+      failedCount += 1;
+      fallbackCount += 1;
+    } else {
+      results[task.idx] = ensureEndPunct(task.sentObj.text, rewritten);
+      successfulCount += 1;
+    }
+    if (onResult) onResult(results[task.idx], task.idx, task.sentObj, failed, {
+      ...metadata,
+      fatal: !!(failed && fatalError),
+      error: failed ? safeErrorSummary(error) : null
+    });
+    return true;
+  }
+
+  function failTasks(tasksToFail, error, metadata = {}) {
+    const registeredFatal = registerFatalError(error);
+    for (const task of tasksToFail) {
+      settleTask(task, task.sentObj.text, true, {
+        attempts: 0,
+        fallback: true,
+        recoveredByFallback: false,
+        promptVariant: task.promptVariant,
+        concurrency: currentLimit,
+        ...metadata,
+        fatal: registeredFatal || !!fatalError
+      }, error);
+    }
+  }
+
   async function executeTask(task, reportPressure, previousTasks = [], groupIndex = null, groupPosition = null) {
     const { idx, sentObj, promptVariant } = task;
-    const context = buildChainedRewriteContext(sentences, results, task, previousTasks);
+    if (fatalError) {
+      failTasks([task], fatalError, { groupIndex, groupPosition, skippedAfterFatal: true });
+      return { failed: true, pressure: false, skipIncrease: true, attempts: 0, error: fatalError };
+    }
+    const legacyContext = buildChainedRewriteContext(sentences, results, task, previousTasks);
+    const previousTask = previousTasks.length ? previousTasks[previousTasks.length - 1] : null;
+    const previousIsAdjacent = !!(previousTask
+      && previousTask.sentObj.pIdx === sentObj.pIdx
+      && previousTask.sourceIndex === task.sourceIndex - 1);
+    const context = rewritePlan === 'four-draft'
+      ? {
+          rewritePlan,
+          fourDraftMode: task.fourDraftMode,
+          register: rewriteRegister || (normalizeRewriteVersion(rewriteVersion) === 'v2' ? '中性书面' : '学术书面'),
+          terms: protectedTerms || '无',
+          previousOut: previousIsAdjacent ? results[previousTask.idx] : '无',
+          previousOps: previousIsAdjacent ? (previousTask.fourDraftOperators || '无') : '无'
+        }
+      : legacyContext;
     let lastError = null;
     let attempts = 0;
     let pressure = false;
@@ -578,16 +696,34 @@ async function rewriteSentences(sentences, {
             sentenceIndex: idx,
             groupIndex,
             groupPosition,
-            contextCount: context.previousRewrittenSentences.length
+            contextCount: rewritePlan === 'four-draft'
+              ? (context.previousOut === '无' ? 0 : 1)
+              : context.previousRewrittenSentences.length,
+            rewritePlan,
+            fourDraftMode: task.fourDraftMode
           }
         });
-        if (!rewritten) {
+        const parsedRewrite = rewritePlan === 'four-draft'
+          ? parseFourDraftOutput(rewritten)
+          : { text: rewritten, operators: '' };
+        if (!parsedRewrite.text) {
           throw createDeepSeekError('DeepSeek 返回内容不可用', {
             code: 'DEEPSEEK_EMPTY_OUTPUT',
             retryable: true
           });
         }
-        results[idx] = ensureEndPunct(sentObj.text, rewritten);
+        task.fourDraftOperators = parsedRewrite.operators;
+        settleTask(task, parsedRewrite.text, false, {
+          attempts,
+          fallback: false,
+          recoveredByFallback: false,
+          promptVariant,
+          fourDraftMode: task.fourDraftMode,
+          operators: task.fourDraftOperators,
+          concurrency: currentLimit,
+          groupIndex,
+          groupPosition
+        });
         if (attempts > 1) retriedCount += 1;
         return { failed: false, pressure, attempts };
       } catch (error) {
@@ -597,6 +733,7 @@ async function rewriteSentences(sentences, {
           || error.code === 'DEEPSEEK_STREAM_ERROR';
         pressure = pressure || attemptPressure;
         if (attemptPressure && reportPressure) reportPressure();
+        registerFatalError(error);
         if (attempt >= retryLimit || error.retryable === false) break;
         await sleep(retryDelay(error, attempt));
       }
@@ -614,27 +751,52 @@ async function rewriteSentences(sentences, {
             sentenceIndex: idx,
             groupIndex,
             groupPosition,
-            contextCount: context.previousRewrittenSentences.length
+            contextCount: rewritePlan === 'four-draft'
+              ? (context.previousOut === '无' ? 0 : 1)
+              : context.previousRewrittenSentences.length,
+            rewritePlan,
+            fourDraftMode: task.fourDraftMode
           }
         });
-        if (!fallbackText) {
+        const parsedFallback = rewritePlan === 'four-draft'
+          ? parseFourDraftOutput(fallbackText)
+          : { text: fallbackText, operators: '' };
+        if (!parsedFallback.text) {
           throw createDeepSeekError('DeepSeek fallback 返回内容不可用', {
             code: 'DEEPSEEK_FALLBACK_EMPTY_OUTPUT',
             retryable: false
           });
         }
-        results[idx] = ensureEndPunct(sentObj.text, fallbackText);
+        task.fourDraftOperators = parsedFallback.operators;
+        settleTask(task, parsedFallback.text, false, {
+          attempts,
+          fallback: false,
+          recoveredByFallback: true,
+          promptVariant,
+          fourDraftMode: task.fourDraftMode,
+          operators: task.fourDraftOperators,
+          concurrency: currentLimit,
+          groupIndex,
+          groupPosition
+        });
         retriedCount += 1;
         fallbackRecoveredCount += 1;
         return { failed: false, pressure: false, skipIncrease: pressure, attempts, recoveredByFallback: true };
       } catch (fallbackError) {
         lastError = fallbackError;
+        registerFatalError(fallbackError);
       }
     }
 
-    failedCount += 1;
-    fallbackCount += 1;
-    results[idx] = sentObj.text;
+    settleTask(task, sentObj.text, true, {
+      attempts,
+      fallback: true,
+      recoveredByFallback: false,
+      promptVariant,
+      concurrency: currentLimit,
+      groupIndex,
+      groupPosition
+    }, lastError);
     logger.warn('单句降重失败，已回退原文', {
       code: lastError && lastError.code || null,
       status: lastError && lastError.status || null,
@@ -648,10 +810,13 @@ async function rewriteSentences(sentences, {
   if (!tasks.length) {
     const emptyOutcome = {
       results,
+      taskCount: 0,
+      successfulCount: 0,
       failedCount,
       retriedCount,
       fallbackCount,
       fallbackRecoveredCount,
+      fatalError: null,
       concurrency: { adaptive: adaptiveConcurrency, min: 0, max: 0, final: 0 }
     };
     endRewriteAuditRun(auditRunId, { ...emptyOutcome, results: undefined });
@@ -668,7 +833,11 @@ async function rewriteSentences(sentences, {
   }
 
   async function executeBatchGroup(group, reportPressure, groupIndex) {
-    const batchTexts = group.map((task) => task.sentObj.text);
+    if (fatalError) {
+      failTasks(group, fatalError, { groupIndex, batch: true, skippedAfterFatal: true });
+      return { failed: true, pressure: false, skipIncrease: true, attempts: 0 };
+    }
+  const batchTexts = group.map((task) => task.sentObj.text);
     const firstTask = group[0];
     const batchContext = { batchTexts };
     let lastError = null;
@@ -692,8 +861,7 @@ async function rewriteSentences(sentences, {
         const rewrittenLines = parseBatchRewriteOutput(output, group.length);
         if (!rewrittenLines) throw createDeepSeekError('批量降重返回句数不匹配', { code: 'DEEPSEEK_BATCH_SHAPE_ERROR', retryable: true });
         group.forEach((task, index) => {
-          results[task.idx] = ensureEndPunct(task.sentObj.text, rewrittenLines[index]);
-          if (onResult) onResult(results[task.idx], task.idx, task.sentObj, false, {
+          settleTask(task, rewrittenLines[index], false, {
             attempts,
             fallback: false,
             recoveredByFallback: false,
@@ -711,9 +879,14 @@ async function rewriteSentences(sentences, {
           || error.code === 'DEEPSEEK_NETWORK_ERROR' || error.code === 'DEEPSEEK_STREAM_ERROR') {
           reportPressure();
         }
+        registerFatalError(error);
         if (attempt >= retryLimit || error.retryable === false) break;
         await sleep(retryDelay(error, attempt));
       }
+    }
+    if (lastError && lastError.retryable === false) {
+      failTasks(group, lastError, { groupIndex, batch: true, batchSize: group.length });
+      return { failed: true, pressure: false, skipIncrease: true, attempts };
     }
     // Experimental mode is fail-safe: if a batch cannot be parsed, preserve
     // the original sentence-by-sentence implementation for this group.
@@ -761,7 +934,7 @@ async function rewriteSentences(sentences, {
           let groupPressure = false;
           let groupFailed = false;
           let groupSkipIncrease = false;
-          if (REWRITE_BATCH_ENABLED && group.length > 1) {
+          if (rewritePlan === 'legacy' && REWRITE_BATCH_ENABLED && group.length > 1) {
             const batchOutcome = await executeBatchGroup(group, () => {
               groupPressure = true;
               tune({ pressure: true, failed: false, skipIncrease: true });
@@ -777,13 +950,6 @@ async function rewriteSentences(sentences, {
             groupPressure = groupPressure || outcome.pressure;
             groupFailed = groupFailed || outcome.failed;
             groupSkipIncrease = groupSkipIncrease || outcome.skipIncrease;
-            if (onResult) onResult(results[task.idx], task.idx, task.sentObj, outcome.failed, {
-              attempts: outcome.attempts,
-              fallback: outcome.failed,
-              recoveredByFallback: !!outcome.recoveredByFallback,
-              promptVariant: task.promptVariant,
-              concurrency: currentLimit
-            });
             if (outcome.failed) previousTasks.length = 0;
             else {
               previousTasks.push(task);
@@ -805,12 +971,25 @@ async function rewriteSentences(sentences, {
     launch();
   });
 
+  for (const task of tasks) {
+    if (!settledTaskIndexes.has(task.idx)) {
+      const unsettledError = fatalError || createDeepSeekError('AI 降重任务未返回结果', {
+        code: 'DEEPSEEK_UNSETTLED_TASK',
+        retryable: false
+      });
+      failTasks([task], unsettledError, { unsettled: true });
+    }
+  }
+
   const outcome = {
     results,
+    taskCount: tasks.length,
+    successfulCount,
     failedCount,
     retriedCount,
     fallbackCount,
     fallbackRecoveredCount,
+    fatalError,
     concurrency: {
       adaptive: adaptiveConcurrency,
       min: minimumObserved,
@@ -821,9 +1000,12 @@ async function rewriteSentences(sentences, {
   };
   endRewriteAuditRun(auditRunId, {
     failedCount,
+    taskCount: tasks.length,
+    successfulCount,
     retriedCount,
     fallbackCount,
     fallbackRecoveredCount,
+    fatalError,
     concurrency: outcome.concurrency
   });
   return outcome;
@@ -860,13 +1042,15 @@ async function finalizeOrder(userId, orderId, rewrittenText, wordCount, creditsC
 router.post('/stream', [
   body('originalText').notEmpty().withMessage('原文不能为空'),
   body('rewriteLevel').optional().isInt({ min: 1, max: 3 }),
-  body('rewriteVersion').optional().isIn(['v1', 'v2', 'v3'])
+  body('rewriteVersion').optional().isIn(['v1', 'v2', 'v3']),
+  body('rewritePlan').optional().isIn(['legacy', 'four-draft'])
 ], async (req, res) => {
   const errors = validationResult(req);
   if (!errors.isEmpty()) return res.status(400).json({ error: '参数验证失败', code: 'VALIDATION_ERROR' });
   const userId = req.user.id;
   const { originalText, rewriteLevel = 2 } = req.body;
   const rewriteVersion = normalizeRewriteVersion(req.body.rewriteVersion);
+  const rewritePlan = normalizeRewritePlan(req.body.rewritePlan);
   const wordCount = originalText.length;
   const creditsCost = Math.ceil(wordCount / 1000 * 18);
   if (!LOCAL_REWRITE_TEST_MODE) {
@@ -894,22 +1078,28 @@ router.post('/stream', [
     srcLen: (s.text && s.text.length) || 1,
     text: s.text || ''
   }));
+  const renderOrder = buildResultOrder(sentences);
   sendEvent('start', {
     total,
     wordCount,
     creditsCost: LOCAL_REWRITE_TEST_MODE ? 0 : creditsCost,
     sentencesMeta,
+    renderOrder,
     rewriteVersion,
+    rewritePlan,
     localTestMode: LOCAL_REWRITE_TEST_MODE
   });
   sentences.forEach((sentObj, idx) => {
-    if (!shouldRewriteSentence(sentObj)) {
+    if (!shouldRewriteSentenceForPlan(sentObj, rewritePlan)) {
       sendEvent('sentence', { index: idx, total, text: sentObj.text, isTitle: sentObj.isTitle, pIdx: sentObj.pIdx, failed: false });
     }
   });
   try {
-    const { results, failedCount } = await rewriteSentences(sentences, {
+    const outcome = await rewriteSentences(sentences, {
       rewriteVersion,
+      rewritePlan,
+      rewriteRegister: req.body.register,
+      protectedTerms: req.body.terms,
       onDelta: (delta, idx, sentObj) => {
         sendEvent('delta', { index: idx, total, pIdx: sentObj.pIdx, text: delta });
       },
@@ -917,6 +1107,8 @@ router.post('/stream', [
         sendEvent('sentence', { index: idx, total, text, isTitle: false, pIdx: sentObj.pIdx, failed });
       }
     });
+    throwIfAllRewriteTasksFailed(outcome);
+    const { results, failedCount } = outcome;
     // 最终降重正文仍由 assembleParagraphs 汇总；逐句逻辑与流式前一致（DeepSeek 返回值经 ensureEndPunct 后写入 sentence，仅多向前端推送 delta 展示）
     const rewrittenText = assembleParagraphs(sentences, results);
     sendEvent('done', {
@@ -938,13 +1130,15 @@ router.post('/stream', [
 router.post('/process', [
   body('originalText').notEmpty().withMessage('\u539f\u6587\u4e0d\u80fd\u4e3a\u7a7a'),
   body('rewriteLevel').optional().isInt({ min: 1, max: 3 }),
-  body('rewriteVersion').optional().isIn(['v1', 'v2', 'v3'])
+  body('rewriteVersion').optional().isIn(['v1', 'v2', 'v3']),
+  body('rewritePlan').optional().isIn(['legacy', 'four-draft'])
 ], async (req, res) => {
   const errors = validationResult(req);
   if (!errors.isEmpty()) return res.status(400).json({ error: '\u53c2\u6570\u9a8c\u8bc1\u5931\u8d25', code: 'VALIDATION_ERROR' });
   const userId = req.user.id;
   const { originalText, rewriteLevel = 2 } = req.body;
   const rewriteVersion = normalizeRewriteVersion(req.body.rewriteVersion);
+  const rewritePlan = normalizeRewritePlan(req.body.rewritePlan);
   const wordCount = originalText.length;
   const creditsCost = Math.ceil(wordCount / 1000 * 18);
   const creditRows = await query('SELECT credits FROM user_credits WHERE user_id = ?', [userId]);
@@ -955,7 +1149,7 @@ router.post('/process', [
   }
 
   try {
-    const rewrittenText = await runRewrite(originalText, rewriteLevel, userId, null, creditsCost, rewriteVersion);
+    const rewrittenText = await runRewrite(originalText, rewriteLevel, userId, null, creditsCost, rewriteVersion, rewritePlan, req.body.register, req.body.terms);
     res.json({
       code: 'SUCCESS',
       data: {
@@ -973,13 +1167,15 @@ router.post('/process', [
 router.post('/start', [
   body('originalText').notEmpty(),
   body('rewriteLevel').optional().isInt({ min: 1, max: 3 }),
-  body('rewriteVersion').optional().isIn(['v1', 'v2', 'v3'])
+  body('rewriteVersion').optional().isIn(['v1', 'v2', 'v3']),
+  body('rewritePlan').optional().isIn(['legacy', 'four-draft'])
 ], async (req, res) => {
   const errors = validationResult(req);
   if (!errors.isEmpty()) return res.status(400).json({ error: '参数验证失败', code: 'VALIDATION_ERROR' });
   const userId = req.user.id;
   const { originalText, rewriteLevel = 2 } = req.body;
   const rewriteVersion = normalizeRewriteVersion(req.body.rewriteVersion);
+  const rewritePlan = normalizeRewritePlan(req.body.rewritePlan);
   const wordCount = originalText.length;
   const creditsCost = Math.ceil(wordCount / 1000 * 18);
   const creditRows = await query('SELECT credits FROM user_credits WHERE user_id = ?', [userId]);
@@ -989,13 +1185,15 @@ router.post('/start', [
       data: { required: creditsCost, available: (creditResult && creditResult.credits) || 0 } });
   }
   res.json({ code: 'SUCCESS', data: { orderId: null, creditsCost, message: '降重任务已启动' } });
-  try { await runRewrite(originalText, rewriteLevel, userId, null, creditsCost, rewriteVersion); } catch (e) { logger.error('降重任务失败: ' + e.message); }
+  try { await runRewrite(originalText, rewriteLevel, userId, null, creditsCost, rewriteVersion, rewritePlan, req.body.register, req.body.terms); } catch (e) { logger.error('降重任务失败: ' + e.message); }
 });
 
-async function runRewrite(originalText, rewriteLevel, userId, orderId, creditsCost, rewriteVersion = 'v1') {
+async function runRewrite(originalText, rewriteLevel, userId, orderId, creditsCost, rewriteVersion = 'v1', rewritePlan = 'legacy', rewriteRegister, protectedTerms) {
   const wordCount = originalText.length;
   const sentences = splitSentences(originalText);
-  const { results } = await rewriteSentences(sentences, { rewriteVersion });
+  const outcome = await rewriteSentences(sentences, { rewriteVersion, rewritePlan, rewriteRegister, protectedTerms });
+  throwIfAllRewriteTasksFailed(outcome);
+  const { results } = outcome;
   const rewrittenText = assembleParagraphs(sentences, results);
   await finalizeOrder(userId, orderId, rewrittenText, wordCount, creditsCost);
   return rewrittenText;
@@ -1017,7 +1215,14 @@ router.get('/result/:orderId', async (req, res) => {
 // The document workflow consumes the exact same sentence splitter and DeepSeek
 // rewrite pipeline.  These references are an internal integration seam only;
 // the existing /api/rewrite routes and their behavior remain unchanged.
-router.documentRewritePipeline = { splitSentences, rewriteSentences, assembleParagraphs, ensureEndPunct };
+router.documentRewritePipeline = {
+  splitSentences,
+  rewriteSentences,
+  buildResultOrder,
+  assembleParagraphs,
+  ensureEndPunct,
+  throwIfAllRewriteTasksFailed
+};
 
 module.exports = router;
 

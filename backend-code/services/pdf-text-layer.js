@@ -13,6 +13,14 @@ function colorKind(rgb) {
   const [red, green, blue] = rgb.slice(0, 3).map((value) => Number(value) / scale);
   if (red >= 0.80 && green <= 0.12 && blue <= 0.28) return 'red';
   if (red >= 0.80 && green >= 0.45 && green <= 0.90 && blue <= 0.65) return 'yellow';
+  const maximum = Math.max(red, green, blue);
+  const minimum = Math.min(red, green, blue);
+  const chroma = maximum - minimum;
+  const saturation = maximum > 0 ? chroma / maximum : 0;
+  // Report vendors also use blue, green and purple font fills to mark AIGC
+  // passages. Accept visible high-chroma fills without treating black, gray,
+  // near-white or subtly tinted body text as marked content.
+  if (saturation >= 0.45 && maximum >= 0.35 && chroma >= 0.20) return 'red';
   return null;
 }
 

@@ -29,22 +29,17 @@ const {
   applyReportMatchToStore,
   applyRewriteResultsToStore
 } = require('../services/red-text-store');
+const { rewriteDocumentSelection } = require('../services/document-rewrite-pipeline');
+const { evaluateMappingPolicy } = require('../services/document-rewrite-mapping-policy');
 
 const router = express.Router();
+// Keep document rewrite aligned with the existing text-rewrite local test
+// mode. This is deliberately disabled in production so real requests still
+// require a user, credits, and database persistence.
+const LOCAL_REWRITE_TEST_MODE = process.env.NODE_ENV !== 'production'
+  && process.env.LOCAL_REWRITE_TEST_MODE === 'true';
 const MAX_FILE_BYTES = Number(process.env.DOCUMENT_REWRITE_MAX_BYTES || 80 * 1024 * 1024);
 const JOB_TTL_MS = Number(process.env.DOCUMENT_REWRITE_JOB_TTL_MS || 60 * 60 * 1000);
-const DOCUMENT_REWRITE_CONCURRENCY = Math.min(
-  256,
-  Math.max(1, Number.parseInt(process.env.DOCUMENT_REWRITE_CONCURRENCY || '128', 10) || 128)
-);
-const DOCUMENT_REWRITE_INITIAL_CONCURRENCY = Math.min(
-  DOCUMENT_REWRITE_CONCURRENCY,
-  Math.max(1, Number.parseInt(process.env.DOCUMENT_REWRITE_INITIAL_CONCURRENCY || '32', 10) || 32)
-);
-const DOCUMENT_REWRITE_MIN_CONCURRENCY = Math.min(
-  DOCUMENT_REWRITE_INITIAL_CONCURRENCY,
-  Math.max(1, Number.parseInt(process.env.DOCUMENT_REWRITE_MIN_CONCURRENCY || '8', 10) || 8)
-);
 // Keep generated documents outside the public `/static` tree. Downloads must
 // go through the authenticated, user-owned job route below.
 // Keep the default beside the backend for normal deployments, while allowing
@@ -102,6 +97,17 @@ function safeName(originalName) {
     .replace(/[<>:"/\\|?*\x00-\x1f]/g, '_').slice(0, 120) || 'document';
   const suffix = /_降重$/u.test(stem) ? '' : '_降重';
   return `${stem}${suffix}.docx`;
+}
+
+function rewriteFailureMessage(fatalError) {
+  const status = Number(fatalError && fatalError.status);
+  const code = String(fatalError && fatalError.code || '');
+  if (status === 402) return 'AI 服务余额不足，本次未生成降重结果，请充值后重新提交';
+  if (status === 401 || status === 403) return 'AI 服务凭据无效或无权限，本次未生成降重结果';
+  if (code === 'AI_NOT_CONFIGURED' || code === 'DOCUMENT_REWRITE_AI_NOT_CONFIGURED') {
+    return 'AI 降重服务未配置，本次未生成降重结果';
+  }
+  return 'AI 降重服务不可用，本次未生成降重结果';
 }
 
 function view(job) {
@@ -206,6 +212,12 @@ async function runJob(job, sourceBuffer, reportBuffer, req) {
       const unresolved = job.redTextStore.segments.filter(
         (segment) => segment.eligibleForRewrite && segment.mapping.status !== 'mapped'
       );
+      const eligibleSegments = job.redTextStore.segments.filter((segment) => segment.eligibleForRewrite).length;
+      const mappingPolicy = evaluateMappingPolicy({
+        eligibleSegments,
+        matchedSentences: reportMatch.indexes.length,
+        unmatchedSegments: unresolved.length
+      });
       logger.info('PDF 检测报告映射完成', {
         jobId: job.id,
         reportFileName: job.reportFileName,
@@ -213,21 +225,33 @@ async function runJob(job, sourceBuffer, reportBuffer, req) {
         redChars: reportMatch.redChars,
         redSegments: reportMatch.redSegmentCount,
         matchedSentences: reportMatch.indexes.length,
-        unmatchedSegments: unresolved.length
+        unmatchedSegments: unresolved.length,
+        unmatchedRatio: mappingPolicy.unmatchedRatio,
+        mappingDecision: mappingPolicy.shouldContinue ? 'continue' : 'review_required'
       });
-      if (!reportMatch.indexes.length || unresolved.length) {
+      if (!report.redSegments.length || !mappingPolicy.shouldContinue) {
         job.status = 'review_required';
+        let reviewReason;
+        if (!report.redSegments.length) {
+          reviewReason = '检测报告中未识别到可用的标色文字（支持 RGB/CMYK 的红、黄、蓝、绿、紫等高饱和度字体填充）';
+        } else if (mappingPolicy.reason === 'excessive-unmatched') {
+          reviewReason = '检测报告中有 ' + unresolved.length + ' 条标色正文无法可靠定位（未匹配比例 ' + (mappingPolicy.unmatchedRatio * 100).toFixed(1) + '%），为避免错改已停止';
+        } else if (!reportMatch.indexes.length) {
+          reviewReason = '已识别到标色文字，但无法与该 Word 文档的正文匹配';
+        } else {
+          reviewReason = '检测报告中的标色正文未能可靠定位，未启动降重';
+        }
         job.reportMatch = {
           fallback: false,
           parser: report.parser || null,
           reviewRequired: true,
-          reason: !reportMatch.indexes.length
-            ? '检测报告中的标红正文无法与该 Word 文档匹配'
-            : ('有 ' + unresolved.length + ' 条标红正文未能可靠定位，未启动降重'),
+          reason: reviewReason,
           redChars: reportMatch.redChars,
           redSegmentCount: reportMatch.redSegmentCount,
           matchedSentences: reportMatch.indexes.length,
           unmatchedFragments: reportMatch.unmatchedFragments.slice(0, 20),
+          unmatchedSegments: unresolved.length,
+          unmatchedRatio: mappingPolicy.unmatchedRatio,
           redTextStore: mappingSummary
         };
         job.results = sourceSentences.map((sentence) => ({
@@ -249,12 +273,15 @@ async function runJob(job, sourceBuffer, reportBuffer, req) {
         redChars: reportMatch.redChars,
         redSegmentCount: reportMatch.redSegmentCount,
         matchedSentences: reportMatch.indexes.length,
-        unmatchedFragments: reportMatch.unmatchedFragments.slice(0, 20)
+        unmatchedFragments: reportMatch.unmatchedFragments.slice(0, 20),
+        partialMapping: unresolved.length > 0,
+        unmatchedSegments: unresolved.length,
+        unmatchedRatio: mappingPolicy.unmatchedRatio
       };
       job.reportMatch.redTextStore = mappingSummary;
       const selectedWordCount = reportMatch.indexes.reduce((total, index) => total + String(sourceSentences[index] && sourceSentences[index].text || '').length, 0);
       job.wordCount = selectedWordCount;
-      job.creditsCost = Math.ceil(selectedWordCount / 1000 * 18);
+      job.creditsCost = LOCAL_REWRITE_TEST_MODE ? 0 : Math.ceil(selectedWordCount / 1000 * 18);
     } catch (reportError) {
       logger.error('PDF 检测报告解析或映射失败', {
         jobId: job.id,
@@ -276,7 +303,7 @@ async function runJob(job, sourceBuffer, reportBuffer, req) {
   } else {
     job.reportMatch = null;
   }
-  if (typeof req.app.locals.documentRewriteCharge === 'function') {
+  if (!LOCAL_REWRITE_TEST_MODE && typeof req.app.locals.documentRewriteCharge === 'function') {
     await req.app.locals.documentRewriteCharge(job, req);
     job.charged = true;
   }
@@ -288,16 +315,11 @@ async function runJob(job, sourceBuffer, reportBuffer, req) {
   job.status = 'processing';
   job.progress.total = selectedIndexes.size;
   job.progress.message = '正在生成降重结果';
-  const selectedSentences = sourceSentences.map((sentence, index) => selectedIndexes.has(index)
-    ? sentence
-    : { ...sentence, isTitle: true });
-  const result = await pipeline.rewriteSentences(selectedSentences, {
-    rewriteVersion: job.rewriteVersion,
-    concurrency: DOCUMENT_REWRITE_CONCURRENCY,
-    initialConcurrency: DOCUMENT_REWRITE_INITIAL_CONCURRENCY,
-    minConcurrency: DOCUMENT_REWRITE_MIN_CONCURRENCY,
-    adaptiveConcurrency: true,
-      onResult: (text, index, sentence, failed, metadata) => {
+  const result = await rewriteDocumentSelection(
+    pipeline,
+    sourceSentences,
+    selectedIndexes,
+    (text, index, sentence, failed, metadata) => {
       if (!selectedIndexes.has(index)) return;
       if (job.results[index]) {
         job.results[index].rewritten = text;
@@ -308,12 +330,9 @@ async function runJob(job, sourceBuffer, reportBuffer, req) {
       if (failed) job.progress.failed += 1;
       job.progress.concurrency = metadata && metadata.concurrency || null;
       job.progress.message = failed ? '处理中，个别句子已回退原文' : '处理中';
-      }
-    });
+    }
+  );
 
-  job.rewrittenText = typeof pipeline.assembleParagraphs === 'function'
-    ? pipeline.assembleParagraphs(sourceSentences, result.results)
-    : sourceSentences.map((sentence, index) => result.results[index] || sentence.text).join('');
   // Titles and short fragments are intentionally returned unchanged by the
   // existing AI pipeline. Mark them after all concurrent requests finish.
   job.results.forEach((item, index) => {
@@ -322,16 +341,42 @@ async function runJob(job, sourceBuffer, reportBuffer, req) {
       item.status = 'skipped';
     }
   });
-  applyRewriteResultsToStore(job.redTextStore, job.results);
-  if (job.reportMatch) job.reportMatch.redTextStore = redTextStoreSummary(job.redTextStore);
-
   job.progress.completed = selectedIndexes.size;
   job.progress.failed = result.failedCount;
   job.progress.retried = result.retriedCount;
   job.progress.fallback = result.fallbackCount;
   job.progress.fallbackRecovered = result.fallbackRecoveredCount;
   job.progress.concurrency = result.concurrency;
-  job.progress.message = '正在准备下载文件';
+  applyRewriteResultsToStore(job.redTextStore, job.results);
+  if (job.reportMatch) job.reportMatch.redTextStore = redTextStoreSummary(job.redTextStore);
+
+  // A document whose every AI-eligible sentence failed is not a rewritten
+  // result. Do not package the unchanged source as a successful download.
+  if (result.taskCount > 0 && result.failedCount >= result.taskCount) {
+    job.status = 'failed';
+    job.error = rewriteFailureMessage(result.fatalError);
+    job.progress.message = job.error;
+    job.rewrittenText = '';
+    job.outputPath = null;
+    job.completedAt = new Date().toISOString();
+    job.failures = result.fatalError ? [{ ...result.fatalError }] : [];
+    logger.error('文档降重全部 AI 任务失败，未生成下载文件', {
+      jobId: job.id,
+      taskCount: result.taskCount,
+      failedCount: result.failedCount,
+      code: result.fatalError && result.fatalError.code || null,
+      status: result.fatalError && result.fatalError.status || null
+    });
+    return;
+  }
+
+  job.rewrittenText = typeof pipeline.assembleParagraphs === 'function'
+    ? pipeline.assembleParagraphs(sourceSentences, result.results)
+    : sourceSentences.map((sentence, index) => result.results[index] || sentence.text).join('');
+
+  job.progress.message = job.reportMatch && job.reportMatch.partialMapping
+    ? ('正在准备下载文件（有 ' + job.reportMatch.unmatchedSegments + ' 条标色片段未定位，已保留原文）')
+    : '正在准备下载文件';
   applyReplacementsInOrder(document, result.results, {
     sourceSentences,
     skipTitles: false,
@@ -339,17 +384,27 @@ async function runJob(job, sourceBuffer, reportBuffer, req) {
   });
   const output = await saveDocx(document);
   job.outputPath = await persistOutput(job, output);
-  if (typeof req.app.locals.documentRewriteSave === 'function') {
+  if (!LOCAL_REWRITE_TEST_MODE && typeof req.app.locals.documentRewriteSave === 'function') {
     await req.app.locals.documentRewriteSave(job);
     job.savedToLibrary = true;
   }
   job.status = 'completed';
-  job.progress.message = result.failedCount ? '处理完成，部分句子保留原文' : '处理完成';
+  job.progress.message = result.failedCount
+    ? ('处理完成，' + result.failedCount + ' 句降重失败并保留原文')
+    : (job.reportMatch && job.reportMatch.partialMapping
+      ? ('处理完成，有 ' + job.reportMatch.unmatchedSegments + ' 条标色片段未定位，已保留原文')
+      : '处理完成');
   job.completedAt = new Date().toISOString();
   job.failures = [];
 }
 
-router.use(authenticateToken);
+router.use((req, res, next) => {
+  if (LOCAL_REWRITE_TEST_MODE) {
+    req.user = { id: 0, phone: 'local-test', nickname: '本地测试' };
+    return next();
+  }
+  return authenticateToken(req, res, next);
+});
 
 router.post('/', (req, res, next) => {
   upload.fields([{ name: 'file', maxCount: 1 }, { name: 'report', maxCount: 1 }])(req, res, (error) => {
@@ -377,9 +432,7 @@ router.post('/', (req, res, next) => {
       status: 'queued',
       fileName: safeName(docxFile.originalname),
       wordCount,
-      creditsCost: Math.ceil(wordCount / 1000 * 18),
-      rewriteLevel: Math.min(3, Math.max(1, Number(req.body.rewriteLevel || 2))),
-      rewriteVersion: ['v1', 'v2', 'v3'].includes(req.body.rewriteVersion) ? req.body.rewriteVersion : 'v1',
+      creditsCost: LOCAL_REWRITE_TEST_MODE ? 0 : Math.ceil(wordCount / 1000 * 18),
       reportFileName: reportFile && normalizeUploadedName(reportFile.originalname, 'report.pdf') || null,
       reportSha256: reportFile && reportFile.buffer ? crypto.createHash('sha256').update(reportFile.buffer).digest('hex') : null,
       redTextStore: null,
@@ -433,6 +486,7 @@ router.get('/:id/download', async (req, res) => {
     res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
     res.setHeader('Content-Length', buffer.length);
     res.setHeader('Content-Disposition', `attachment; filename="${ascii}"; filename*=UTF-8''${encodeURIComponent(job.fileName)}`);
+    res.setHeader('Access-Control-Expose-Headers', 'Content-Disposition');
     res.setHeader('Cache-Control', 'no-store');
     res.send(buffer);
   } catch (error) {
@@ -443,4 +497,5 @@ router.get('/:id/download', async (req, res) => {
 
 router._jobs = jobs;
 router._runJob = runJob;
+router._view = view;
 module.exports = router;
