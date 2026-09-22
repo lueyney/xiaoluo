@@ -1,12 +1,8 @@
 /**
  * Shared rewrite prompt and request-message builder.
  *
- * The legacy rewrite entry points deliberately resolve to one shared prompt.
- * The optional four-draft plan is isolated in rewrite-four-draft.js so the
- * original prompt and document workflow remain unchanged.
+ * The AI rewrite and document rewrite entry points resolve to one shared prompt.
  */
-const { buildFourDraftMessages } = require('./rewrite-four-draft');
-
 const BEST_REWRITE_PROMPT = `角色：低AI特征逐句改写。单位是句，不跨句合并，不新增原文
 没有的信息，不改变语域。
 专业术语密度不得低于原文。
@@ -74,9 +70,6 @@ function getRewritePrompt() {
 }
 
 function buildRewriteMessages(text, context = {}) {
-  if (context.rewritePlan === 'four-draft') {
-    return buildFourDraftMessages(text, context);
-  }
   const input = text == null ? '' : String(text);
   const batchTexts = Array.isArray(context.batchTexts)
     ? context.batchTexts.map((item) => String(item == null ? '' : item).trim()).filter(Boolean)

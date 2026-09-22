@@ -1,7 +1,6 @@
 let rewriteState = {
     isProcessing: false,
     rewriteVersion: 'v1',
-    rewritePlan: 'legacy',
     originalText: '',
     rewrittenText: '',
     liveText: '',
@@ -309,13 +308,13 @@ function revealFirstTitleAfterDelay() {
     }, 5000);
 }
 
-async function streamRewriteResult(originalText, level, rewriteVersion, rewritePlan) {
+async function streamRewriteResult(originalText, level, rewriteVersion) {
     const url = `${CONFIG.API_BASE_URL}/rewrite/stream`;
     const controller = rewriteState.abortController;
     const response = await fetch(url, {
         method: 'POST',
         headers: api.getHeaders(),
-        body: JSON.stringify({ originalText: originalText, rewriteLevel: level, rewriteVersion: rewriteVersion, rewritePlan: rewritePlan }),
+        body: JSON.stringify({ originalText: originalText, rewriteLevel: level, rewriteVersion: rewriteVersion }),
         signal: controller.signal
     });
 
@@ -509,10 +508,6 @@ router.register('rewrite', function() {
                     </div>
                 </div>
                 <div class="rewrite-toolbar" style="display:flex;align-items:center;gap:12px;">
-                    <div id="rewritePlanTabs" style="display:inline-flex;align-items:center;padding:4px;border-radius:12px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.1);gap:4px;">
-                        <button type="button" data-rewrite-plan="legacy" style="padding:9px 15px;border-radius:8px;border:none;cursor:pointer;font-size:13px;font-weight:700;transition:background-color .12s,color .12s,box-shadow .12s;">原方案</button>
-                        <button type="button" data-rewrite-plan="four-draft" style="padding:9px 15px;border-radius:8px;border:none;cursor:pointer;font-size:13px;font-weight:700;transition:background-color .12s,color .12s,box-shadow .12s;">四档新版</button>
-                    </div>
                     <div id="rewriteVersionTabs" style="display:inline-flex;align-items:center;padding:4px;border-radius:12px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.1);gap:4px;">
                         <button type="button" data-rewrite-version="v1" style="padding:9px 18px;border-radius:8px;border:none;cursor:pointer;font-size:13px;font-weight:700;transition:background-color .12s,color .12s,box-shadow .12s;">V1 学术版</button>
                         <button type="button" data-rewrite-version="v2" style="padding:9px 18px;border-radius:8px;border:none;cursor:pointer;font-size:13px;font-weight:700;transition:background-color .12s,color .12s,box-shadow .12s;">V2 小说版</button>
@@ -548,21 +543,7 @@ router.register('rewrite', function() {
     const originalTextEl = document.getElementById('originalText');
     const textCount = document.getElementById('textCount');
     const estimatedCredits = document.getElementById('estimatedCredits');
-    const rewritePlanTabs = document.getElementById('rewritePlanTabs');
     const rewriteVersionTabs = document.getElementById('rewriteVersionTabs');
-
-    function syncRewritePlanTabs() {
-        const buttons = rewritePlanTabs.querySelectorAll('[data-rewrite-plan]');
-        buttons.forEach(function(button) {
-            const active = button.dataset.rewritePlan === rewriteState.rewritePlan;
-            button.classList.toggle('is-active', active);
-            button.setAttribute('aria-pressed', String(active));
-            button.style.background = active ? '#0ea5e9' : 'transparent';
-            button.style.color = active ? '#fff' : 'rgba(255,255,255,.55)';
-            button.style.boxShadow = active ? '0 3px 10px rgba(14,165,233,.28)' : 'none';
-        });
-        rewriteVersionTabs.style.display = rewriteState.rewritePlan === 'legacy' ? 'inline-flex' : 'none';
-    }
 
     function syncRewriteVersionTabs() {
         const buttons = rewriteVersionTabs.querySelectorAll('[data-rewrite-version]');
@@ -584,15 +565,6 @@ router.register('rewrite', function() {
             : 'v1';
         syncRewriteVersionTabs();
     });
-    rewritePlanTabs.addEventListener('click', function(event) {
-        const button = event.target.closest('[data-rewrite-plan]');
-        if (!button || rewriteState.isProcessing) return;
-        rewriteState.rewritePlan = ['legacy', 'four-draft'].includes(button.dataset.rewritePlan)
-            ? button.dataset.rewritePlan
-            : 'legacy';
-        syncRewritePlanTabs();
-    });
-    syncRewritePlanTabs();
     syncRewriteVersionTabs();
 
     function updateCounts() {
@@ -650,7 +622,7 @@ router.register('rewrite', function() {
         try {
             rewriteState.progressLabel = '0%';
             syncRewriteView();
-            const finalText = await streamRewriteResult(originalText, 2, rewriteState.rewriteVersion, rewriteState.rewritePlan);
+            const finalText = await streamRewriteResult(originalText, 2, rewriteState.rewriteVersion);
             if (!finalText) {
                 throw new Error('未收到降重结果');
             }

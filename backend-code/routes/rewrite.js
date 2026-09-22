@@ -12,17 +12,11 @@ const {
   normalizeRewriteVersion
 } = require('../services/rewrite-prompts');
 const {
-  normalizeRewritePlan,
-  assignFourDraftModes,
-  parseFourDraftOutput
-} = require('../services/rewrite-four-draft');
-const {
   logDeepSeekSelection
 } = require('../services/ai-model-router');
 const { getRewriteConfig, buildRewritePayload } = require('../services/rewrite-config');
 const {
   groupRewriteTasks,
-  groupRewriteTasksByParagraph,
   buildChainedRewriteContext
 } = require('../services/rewrite-groups');
 const {
@@ -48,9 +42,7 @@ router.get('/mode', (req, res) => {
         topP: rewriteConfig.topP,
         thinking: rewriteConfig.selection.thinking,
         reasoningEffort: rewriteConfig.selection.reasoningEffort || 'provider-default',
-        batchMode: REWRITE_BATCH_MODE,
-        plans: ['legacy', 'four-draft'],
-        defaultPlan: 'legacy'
+        batchMode: REWRITE_BATCH_MODE
       }
     }
   });
@@ -503,24 +495,16 @@ function shouldRewriteSentence(sentObj) {
   return !sentObj.isTitle && effectiveContentLength(sentObj.text) >= 6;
 }
 
-function shouldRewriteSentenceForPlan(sentObj, rewritePlan) {
-  return !sentObj.isTitle && effectiveContentLength(sentObj.text) >= (rewritePlan === 'four-draft' ? 1 : 6);
-}
-
 async function rewriteSentences(sentences, {
   onDelta,
   onResult,
   rewriteVersion = 'v1',
-  rewritePlan = 'legacy',
-  rewriteRegister,
-  protectedTerms,
   concurrency = REWRITE_CONCURRENCY,
   adaptiveConcurrency = true,
   initialConcurrency = REWRITE_INITIAL_CONCURRENCY,
   minConcurrency = REWRITE_MIN_CONCURRENCY,
   maxRetries = adaptiveConcurrency ? DEEPSEEK_RETRY_MAX : 0
 } = {}) {
-  rewritePlan = normalizeRewritePlan(rewritePlan);
   const results = sentences.map((sentObj) => sentObj.text);
   const tasks = [];
   let failedCount = 0;
@@ -531,31 +515,23 @@ async function rewriteSentences(sentences, {
   let fatalError = null;
   const settledTaskIndexes = new Set();
 
-  const academicAlternation = rewritePlan === 'legacy' && normalizeRewriteVersion(rewriteVersion) === 'v1';
-  const fourDraftModes = rewritePlan === 'four-draft' ? assignFourDraftModes(sentences) : [];
+  const academicAlternation = normalizeRewriteVersion(rewriteVersion) === 'v1';
   for (let idx = 0; idx < sentences.length; idx++) {
-    if (!shouldRewriteSentenceForPlan(sentences[idx], rewritePlan)) continue;
+    if (!shouldRewriteSentence(sentences[idx])) continue;
     tasks.push({
       idx,
       sentObj: sentences[idx],
       sourceIndex: Number.isInteger(sentences[idx].sourceIndex) ? sentences[idx].sourceIndex : idx,
-      promptVariant: academicAlternation ? academicPromptVariantForIndex(tasks.length) : null,
-      fourDraftMode: fourDraftModes[idx] || null,
-      fourDraftOperators: ''
+      promptVariant: academicAlternation ? academicPromptVariantForIndex(tasks.length) : null
     });
   }
-  const groups = rewritePlan === 'four-draft'
-    ? groupRewriteTasksByParagraph(tasks)
-    : groupRewriteTasks(tasks, REWRITE_GROUP_SIZE);
+  const groups = groupRewriteTasks(tasks, REWRITE_GROUP_SIZE);
   logger.info('AI降重任务拆分完成', {
     model: getRewriteConfig().model,
     rewriteVersion,
-    rewritePlan,
-    requestMode: rewritePlan === 'four-draft'
-      ? 'one-sentence-per-request-four-draft'
-      : (REWRITE_BATCH_ENABLED ? 'five-sentences-per-request-experimental' : 'one-sentence-per-request'),
+    requestMode: REWRITE_BATCH_ENABLED ? 'five-sentences-per-request-experimental' : 'one-sentence-per-request',
     sentenceUnits: sentences.length,
-    requestCount: rewritePlan === 'four-draft' || !REWRITE_BATCH_ENABLED ? tasks.length : groups.length,
+    requestCount: REWRITE_BATCH_ENABLED ? groups.length : tasks.length,
     skippedCount: sentences.length - tasks.length
   });
   const auditRunId = beginRewriteAuditRun({
@@ -565,11 +541,10 @@ async function rewriteSentences(sentences, {
     thinking: getRewriteConfig().selection.thinking,
     reasoningEffort: getRewriteConfig().selection.reasoningEffort || 'provider-default',
     rewriteVersion,
-    rewritePlan,
     groupSize: REWRITE_GROUP_SIZE,
     groupCount: groups.length,
     sentenceUnits: sentences.length,
-    requestCount: rewritePlan === 'four-draft' || !REWRITE_BATCH_ENABLED ? tasks.length : groups.length,
+    requestCount: REWRITE_BATCH_ENABLED ? groups.length : tasks.length,
     skippedCount: sentences.length - tasks.length
   });
 
@@ -663,21 +638,7 @@ async function rewriteSentences(sentences, {
       failTasks([task], fatalError, { groupIndex, groupPosition, skippedAfterFatal: true });
       return { failed: true, pressure: false, skipIncrease: true, attempts: 0, error: fatalError };
     }
-    const legacyContext = buildChainedRewriteContext(sentences, results, task, previousTasks);
-    const previousTask = previousTasks.length ? previousTasks[previousTasks.length - 1] : null;
-    const previousIsAdjacent = !!(previousTask
-      && previousTask.sentObj.pIdx === sentObj.pIdx
-      && previousTask.sourceIndex === task.sourceIndex - 1);
-    const context = rewritePlan === 'four-draft'
-      ? {
-          rewritePlan,
-          fourDraftMode: task.fourDraftMode,
-          register: rewriteRegister || (normalizeRewriteVersion(rewriteVersion) === 'v2' ? '中性书面' : '学术书面'),
-          terms: protectedTerms || '无',
-          previousOut: previousIsAdjacent ? results[previousTask.idx] : '无',
-          previousOps: previousIsAdjacent ? (previousTask.fourDraftOperators || '无') : '无'
-        }
-      : legacyContext;
+    const context = buildChainedRewriteContext(sentences, results, task, previousTasks);
     let lastError = null;
     let attempts = 0;
     let pressure = false;
@@ -696,30 +657,20 @@ async function rewriteSentences(sentences, {
             sentenceIndex: idx,
             groupIndex,
             groupPosition,
-            contextCount: rewritePlan === 'four-draft'
-              ? (context.previousOut === '无' ? 0 : 1)
-              : context.previousRewrittenSentences.length,
-            rewritePlan,
-            fourDraftMode: task.fourDraftMode
+            contextCount: context.previousRewrittenSentences.length
           }
         });
-        const parsedRewrite = rewritePlan === 'four-draft'
-          ? parseFourDraftOutput(rewritten)
-          : { text: rewritten, operators: '' };
-        if (!parsedRewrite.text) {
+        if (!rewritten) {
           throw createDeepSeekError('DeepSeek 返回内容不可用', {
             code: 'DEEPSEEK_EMPTY_OUTPUT',
             retryable: true
           });
         }
-        task.fourDraftOperators = parsedRewrite.operators;
-        settleTask(task, parsedRewrite.text, false, {
+        settleTask(task, rewritten, false, {
           attempts,
           fallback: false,
           recoveredByFallback: false,
           promptVariant,
-          fourDraftMode: task.fourDraftMode,
-          operators: task.fourDraftOperators,
           concurrency: currentLimit,
           groupIndex,
           groupPosition
@@ -751,30 +702,20 @@ async function rewriteSentences(sentences, {
             sentenceIndex: idx,
             groupIndex,
             groupPosition,
-            contextCount: rewritePlan === 'four-draft'
-              ? (context.previousOut === '无' ? 0 : 1)
-              : context.previousRewrittenSentences.length,
-            rewritePlan,
-            fourDraftMode: task.fourDraftMode
+            contextCount: context.previousRewrittenSentences.length
           }
         });
-        const parsedFallback = rewritePlan === 'four-draft'
-          ? parseFourDraftOutput(fallbackText)
-          : { text: fallbackText, operators: '' };
-        if (!parsedFallback.text) {
+        if (!fallbackText) {
           throw createDeepSeekError('DeepSeek fallback 返回内容不可用', {
             code: 'DEEPSEEK_FALLBACK_EMPTY_OUTPUT',
             retryable: false
           });
         }
-        task.fourDraftOperators = parsedFallback.operators;
-        settleTask(task, parsedFallback.text, false, {
+        settleTask(task, fallbackText, false, {
           attempts,
           fallback: false,
           recoveredByFallback: true,
           promptVariant,
-          fourDraftMode: task.fourDraftMode,
-          operators: task.fourDraftOperators,
           concurrency: currentLimit,
           groupIndex,
           groupPosition
@@ -934,7 +875,7 @@ async function rewriteSentences(sentences, {
           let groupPressure = false;
           let groupFailed = false;
           let groupSkipIncrease = false;
-          if (rewritePlan === 'legacy' && REWRITE_BATCH_ENABLED && group.length > 1) {
+          if (REWRITE_BATCH_ENABLED && group.length > 1) {
             const batchOutcome = await executeBatchGroup(group, () => {
               groupPressure = true;
               tune({ pressure: true, failed: false, skipIncrease: true });
@@ -1042,15 +983,13 @@ async function finalizeOrder(userId, orderId, rewrittenText, wordCount, creditsC
 router.post('/stream', [
   body('originalText').notEmpty().withMessage('原文不能为空'),
   body('rewriteLevel').optional().isInt({ min: 1, max: 3 }),
-  body('rewriteVersion').optional().isIn(['v1', 'v2', 'v3']),
-  body('rewritePlan').optional().isIn(['legacy', 'four-draft'])
+  body('rewriteVersion').optional().isIn(['v1', 'v2', 'v3'])
 ], async (req, res) => {
   const errors = validationResult(req);
   if (!errors.isEmpty()) return res.status(400).json({ error: '参数验证失败', code: 'VALIDATION_ERROR' });
   const userId = req.user.id;
   const { originalText, rewriteLevel = 2 } = req.body;
   const rewriteVersion = normalizeRewriteVersion(req.body.rewriteVersion);
-  const rewritePlan = normalizeRewritePlan(req.body.rewritePlan);
   const wordCount = originalText.length;
   const creditsCost = Math.ceil(wordCount / 1000 * 18);
   if (!LOCAL_REWRITE_TEST_MODE) {
@@ -1086,20 +1025,16 @@ router.post('/stream', [
     sentencesMeta,
     renderOrder,
     rewriteVersion,
-    rewritePlan,
     localTestMode: LOCAL_REWRITE_TEST_MODE
   });
   sentences.forEach((sentObj, idx) => {
-    if (!shouldRewriteSentenceForPlan(sentObj, rewritePlan)) {
+    if (!shouldRewriteSentence(sentObj)) {
       sendEvent('sentence', { index: idx, total, text: sentObj.text, isTitle: sentObj.isTitle, pIdx: sentObj.pIdx, failed: false });
     }
   });
   try {
     const outcome = await rewriteSentences(sentences, {
       rewriteVersion,
-      rewritePlan,
-      rewriteRegister: req.body.register,
-      protectedTerms: req.body.terms,
       onDelta: (delta, idx, sentObj) => {
         sendEvent('delta', { index: idx, total, pIdx: sentObj.pIdx, text: delta });
       },
@@ -1130,15 +1065,13 @@ router.post('/stream', [
 router.post('/process', [
   body('originalText').notEmpty().withMessage('\u539f\u6587\u4e0d\u80fd\u4e3a\u7a7a'),
   body('rewriteLevel').optional().isInt({ min: 1, max: 3 }),
-  body('rewriteVersion').optional().isIn(['v1', 'v2', 'v3']),
-  body('rewritePlan').optional().isIn(['legacy', 'four-draft'])
+  body('rewriteVersion').optional().isIn(['v1', 'v2', 'v3'])
 ], async (req, res) => {
   const errors = validationResult(req);
   if (!errors.isEmpty()) return res.status(400).json({ error: '\u53c2\u6570\u9a8c\u8bc1\u5931\u8d25', code: 'VALIDATION_ERROR' });
   const userId = req.user.id;
   const { originalText, rewriteLevel = 2 } = req.body;
   const rewriteVersion = normalizeRewriteVersion(req.body.rewriteVersion);
-  const rewritePlan = normalizeRewritePlan(req.body.rewritePlan);
   const wordCount = originalText.length;
   const creditsCost = Math.ceil(wordCount / 1000 * 18);
   const creditRows = await query('SELECT credits FROM user_credits WHERE user_id = ?', [userId]);
@@ -1149,7 +1082,7 @@ router.post('/process', [
   }
 
   try {
-    const rewrittenText = await runRewrite(originalText, rewriteLevel, userId, null, creditsCost, rewriteVersion, rewritePlan, req.body.register, req.body.terms);
+    const rewrittenText = await runRewrite(originalText, rewriteLevel, userId, null, creditsCost, rewriteVersion);
     res.json({
       code: 'SUCCESS',
       data: {
@@ -1167,15 +1100,13 @@ router.post('/process', [
 router.post('/start', [
   body('originalText').notEmpty(),
   body('rewriteLevel').optional().isInt({ min: 1, max: 3 }),
-  body('rewriteVersion').optional().isIn(['v1', 'v2', 'v3']),
-  body('rewritePlan').optional().isIn(['legacy', 'four-draft'])
+  body('rewriteVersion').optional().isIn(['v1', 'v2', 'v3'])
 ], async (req, res) => {
   const errors = validationResult(req);
   if (!errors.isEmpty()) return res.status(400).json({ error: '参数验证失败', code: 'VALIDATION_ERROR' });
   const userId = req.user.id;
   const { originalText, rewriteLevel = 2 } = req.body;
   const rewriteVersion = normalizeRewriteVersion(req.body.rewriteVersion);
-  const rewritePlan = normalizeRewritePlan(req.body.rewritePlan);
   const wordCount = originalText.length;
   const creditsCost = Math.ceil(wordCount / 1000 * 18);
   const creditRows = await query('SELECT credits FROM user_credits WHERE user_id = ?', [userId]);
@@ -1185,13 +1116,13 @@ router.post('/start', [
       data: { required: creditsCost, available: (creditResult && creditResult.credits) || 0 } });
   }
   res.json({ code: 'SUCCESS', data: { orderId: null, creditsCost, message: '降重任务已启动' } });
-  try { await runRewrite(originalText, rewriteLevel, userId, null, creditsCost, rewriteVersion, rewritePlan, req.body.register, req.body.terms); } catch (e) { logger.error('降重任务失败: ' + e.message); }
+  try { await runRewrite(originalText, rewriteLevel, userId, null, creditsCost, rewriteVersion); } catch (e) { logger.error('降重任务失败: ' + e.message); }
 });
 
-async function runRewrite(originalText, rewriteLevel, userId, orderId, creditsCost, rewriteVersion = 'v1', rewritePlan = 'legacy', rewriteRegister, protectedTerms) {
+async function runRewrite(originalText, rewriteLevel, userId, orderId, creditsCost, rewriteVersion = 'v1') {
   const wordCount = originalText.length;
   const sentences = splitSentences(originalText);
-  const outcome = await rewriteSentences(sentences, { rewriteVersion, rewritePlan, rewriteRegister, protectedTerms });
+  const outcome = await rewriteSentences(sentences, { rewriteVersion });
   throwIfAllRewriteTasksFailed(outcome);
   const { results } = outcome;
   const rewrittenText = assembleParagraphs(sentences, results);

@@ -32,25 +32,7 @@ function buildChainedRewriteContext(sentences, results, task, previousSuccessful
   };
 }
 
-function groupRewriteTasksByParagraph(tasks) {
-  const groups = [];
-  let current = [];
-  let currentParagraph = null;
-  for (const task of tasks) {
-    const paragraph = task && task.sentObj ? task.sentObj.pIdx : null;
-    if (current.length && paragraph !== currentParagraph) {
-      groups.push(current);
-      current = [];
-    }
-    currentParagraph = paragraph;
-    current.push(task);
-  }
-  if (current.length) groups.push(current);
-  return groups;
-}
-
 module.exports = {
   groupRewriteTasks,
-  groupRewriteTasksByParagraph,
   buildChainedRewriteContext
 };
