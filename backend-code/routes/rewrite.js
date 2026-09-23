@@ -14,7 +14,13 @@ const {
 const {
   logDeepSeekSelection
 } = require('../services/ai-model-router');
-const { getRewriteConfig, buildRewritePayload } = require('../services/rewrite-config');
+const {
+  getRewriteConfig,
+  getRewriteProviderCycle,
+  getRewriteProviderConfig,
+  rewriteProviderSummary,
+  buildRewritePayload
+} = require('../services/rewrite-config');
 const {
   groupRewriteTasks,
   buildChainedRewriteContext
@@ -32,6 +38,7 @@ const LOCAL_REWRITE_TEST_MODE = process.env.NODE_ENV !== 'production'
 
 router.get('/mode', (req, res) => {
   const rewriteConfig = getRewriteConfig();
+  const providerCycle = getRewriteProviderCycle();
   res.json({
     code: 'SUCCESS',
     data: {
@@ -42,7 +49,9 @@ router.get('/mode', (req, res) => {
         topP: rewriteConfig.topP,
         thinking: rewriteConfig.selection.thinking,
         reasoningEffort: rewriteConfig.selection.reasoningEffort || 'provider-default',
-        batchMode: REWRITE_BATCH_MODE
+        batchMode: REWRITE_BATCH_MODE,
+        providerRotation: providerCycle.length > 1,
+        providerCycle: providerCycle.map(rewriteProviderSummary)
       }
     }
   });
@@ -158,10 +167,16 @@ async function rewriteWithDeepSeek(text, onDelta, rewriteVersion = 'v1', options
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), timeoutMs);
   try {
-    const apiKey = process.env.DEEPSEEK_API_KEY;
-    const baseURL = (process.env.DEEPSEEK_API_BASE || 'https://api.deepseek.com').replace(/\/+$/, '');
-    const selection = getRewriteConfig().selection;
-    if (!apiKey) throw createDeepSeekError('AI降重服务未配置', { retryable: false, code: 'AI_NOT_CONFIGURED' });
+    const providerConfig = getRewriteProviderConfig(options.providerRouteId);
+    const apiKey = process.env[providerConfig.apiKeyEnv];
+    const baseURL = providerConfig.apiBase;
+    const selection = { ...providerConfig.selection, provider: providerConfig.provider, routeId: providerConfig.routeId };
+    if (!apiKey) throw createDeepSeekError(`${providerConfig.provider} 降重服务未配置`, {
+      retryable: false,
+      code: 'AI_NOT_CONFIGURED',
+      provider: providerConfig.provider,
+      model: providerConfig.model
+    });
     logDeepSeekSelection(logger, selection, { caller: 'rewriteWithDeepSeek' });
 
     let response;
@@ -170,9 +185,14 @@ async function rewriteWithDeepSeek(text, onDelta, rewriteVersion = 'v1', options
     try {
       requestPayload = buildRewritePayload({
         messages: buildRewriteMessages(text, options.context),
-        stream: true
+        stream: true,
+        providerConfig
       });
-      auditRequestId = auditRewriteRequest(requestPayload, options.audit);
+      auditRequestId = auditRewriteRequest(requestPayload, {
+        ...options.audit,
+        provider: providerConfig.provider,
+        routeId: providerConfig.routeId
+      });
       response = await fetch(baseURL + '/chat/completions', {
         method: 'POST',
         headers: {
@@ -185,20 +205,22 @@ async function rewriteWithDeepSeek(text, onDelta, rewriteVersion = 'v1', options
     } catch (error) {
       const timedOut = controller.signal.aborted;
       throw createDeepSeekError(
-        timedOut ? `DeepSeek 请求超过 ${Math.round(timeoutMs / 1000)} 秒` : 'DeepSeek 网络请求失败',
-        { code: timedOut ? 'DEEPSEEK_TIMEOUT' : 'DEEPSEEK_NETWORK_ERROR', retryable: true }
+        timedOut ? `${providerConfig.provider} 请求超过 ${Math.round(timeoutMs / 1000)} 秒` : `${providerConfig.provider} 网络请求失败`,
+        { code: timedOut ? 'DEEPSEEK_TIMEOUT' : 'DEEPSEEK_NETWORK_ERROR', retryable: true, provider: providerConfig.provider, model: providerConfig.model }
       );
     }
 
     if (!response.ok) {
       const detail = await response.text();
       const retryable = isRetryableStatus(response.status);
-      logger.warn('DeepSeek API调用失败: HTTP ' + response.status + ' ' + detail.slice(0, 300));
-      throw createDeepSeekError('DeepSeek降重请求失败', {
+      logger.warn(`${providerConfig.provider} API调用失败: HTTP ${response.status} ${detail.slice(0, 300)}`);
+      throw createDeepSeekError(`${providerConfig.provider} 降重请求失败`, {
         code: 'DEEPSEEK_HTTP_ERROR',
         status: response.status,
         retryable,
-        retryAfterMs: retryAfterMs(response)
+        retryAfterMs: retryAfterMs(response),
+        provider: providerConfig.provider,
+        model: providerConfig.model
       });
     }
 
@@ -226,7 +248,7 @@ async function rewriteWithDeepSeek(text, onDelta, rewriteVersion = 'v1', options
         if (onDelta) onDelta(delta);
       }
     } catch (error) {
-      logger.warn('忽略无法解析的DeepSeek流式片段');
+      logger.warn(`忽略无法解析的${providerConfig.provider}流式片段`);
     }
   }
 
@@ -244,13 +266,15 @@ async function rewriteWithDeepSeek(text, onDelta, rewriteVersion = 'v1', options
       auditRewriteUsage(responseUsage, {
         ...options.audit,
         requestId: auditRequestId,
-        model: responseModel
+        model: responseModel,
+        provider: providerConfig.provider,
+        routeId: providerConfig.routeId
       });
     } catch (error) {
       const timedOut = controller.signal.aborted;
       throw createDeepSeekError(
-        timedOut ? `DeepSeek 请求超过 ${Math.round(timeoutMs / 1000)} 秒` : 'DeepSeek 流式响应中断',
-        { code: timedOut ? 'DEEPSEEK_TIMEOUT' : 'DEEPSEEK_STREAM_ERROR', retryable: true }
+        timedOut ? `${providerConfig.provider} 请求超过 ${Math.round(timeoutMs / 1000)} 秒` : `${providerConfig.provider} 流式响应中断`,
+        { code: timedOut ? 'DEEPSEEK_TIMEOUT' : 'DEEPSEEK_STREAM_ERROR', retryable: true, provider: providerConfig.provider, model: providerConfig.model }
       );
     }
 
@@ -279,10 +303,16 @@ async function rewriteWithDeepSeekFallback(text, rewriteVersion = 'v1', context 
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), DEEPSEEK_FALLBACK_TIMEOUT_MS);
   try {
-    const apiKey = process.env.DEEPSEEK_API_KEY;
-    const baseURL = (process.env.DEEPSEEK_API_BASE || 'https://api.deepseek.com').replace(/\/+$/, '');
-    const selection = getRewriteConfig().selection;
-    if (!apiKey) throw createDeepSeekError('AI降重服务未配置', { retryable: false, code: 'AI_NOT_CONFIGURED' });
+    const providerConfig = getRewriteProviderConfig(context.providerRouteId);
+    const apiKey = process.env[providerConfig.apiKeyEnv];
+    const baseURL = providerConfig.apiBase;
+    const selection = { ...providerConfig.selection, provider: providerConfig.provider, routeId: providerConfig.routeId };
+    if (!apiKey) throw createDeepSeekError(`${providerConfig.provider} 降重服务未配置`, {
+      retryable: false,
+      code: 'AI_NOT_CONFIGURED',
+      provider: providerConfig.provider,
+      model: providerConfig.model
+    });
     logDeepSeekSelection(logger, selection, { caller: 'rewriteWithDeepSeekFallback' });
     let response;
     let requestPayload;
@@ -290,9 +320,15 @@ async function rewriteWithDeepSeekFallback(text, rewriteVersion = 'v1', context 
     try {
       requestPayload = buildRewritePayload({
         messages: buildRewriteMessages(text, context),
-        stream: false
+        stream: false,
+        providerConfig
       });
-      auditRequestId = auditRewriteRequest(requestPayload, { ...context.audit, phase: 'fallback' });
+      auditRequestId = auditRewriteRequest(requestPayload, {
+        ...context.audit,
+        phase: 'fallback',
+        provider: providerConfig.provider,
+        routeId: providerConfig.routeId
+      });
       response = await fetch(baseURL + '/chat/completions', {
         method: 'POST',
         headers: {
@@ -304,17 +340,19 @@ async function rewriteWithDeepSeekFallback(text, rewriteVersion = 'v1', context 
       });
     } catch (error) {
       throw createDeepSeekError(
-        controller.signal.aborted ? 'DeepSeek fallback 请求超时' : 'DeepSeek fallback 网络请求失败',
-        { code: controller.signal.aborted ? 'DEEPSEEK_FALLBACK_TIMEOUT' : 'DEEPSEEK_FALLBACK_NETWORK_ERROR', retryable: false }
+        controller.signal.aborted ? `${providerConfig.provider} fallback 请求超时` : `${providerConfig.provider} fallback 网络请求失败`,
+        { code: controller.signal.aborted ? 'DEEPSEEK_FALLBACK_TIMEOUT' : 'DEEPSEEK_FALLBACK_NETWORK_ERROR', retryable: false, provider: providerConfig.provider, model: providerConfig.model }
       );
     }
     if (!response.ok) {
       const detail = await response.text();
-      logger.warn('DeepSeek fallback 调用失败: HTTP ' + response.status + ' ' + detail.slice(0, 300));
-      throw createDeepSeekError('DeepSeek fallback 请求失败', {
+      logger.warn(`${providerConfig.provider} fallback 调用失败: HTTP ${response.status} ${detail.slice(0, 300)}`);
+      throw createDeepSeekError(`${providerConfig.provider} fallback 请求失败`, {
         code: 'DEEPSEEK_FALLBACK_HTTP_ERROR',
         status: response.status,
-        retryable: false
+        retryable: false,
+        provider: providerConfig.provider,
+        model: providerConfig.model
       });
     }
     const responsePayload = await response.json();
@@ -322,7 +360,9 @@ async function rewriteWithDeepSeekFallback(text, rewriteVersion = 'v1', context 
       ...context.audit,
       phase: 'fallback',
       requestId: auditRequestId,
-      model: responsePayload.model || requestPayload.model
+      model: responsePayload.model || requestPayload.model,
+      provider: providerConfig.provider,
+      routeId: providerConfig.routeId
     });
     const rewritten = extractMessageContent(responsePayload).trim();
     if (!rewritten) {
@@ -507,21 +547,28 @@ async function rewriteSentences(sentences, {
 } = {}) {
   const results = sentences.map((sentObj) => sentObj.text);
   const tasks = [];
+  const providerCycle = getRewriteProviderCycle();
   let failedCount = 0;
   let successfulCount = 0;
   let retriedCount = 0;
   let fallbackCount = 0;
   let fallbackRecoveredCount = 0;
   let fatalError = null;
+  const providerFatalErrors = new Map();
+  const providerRouteIds = new Set(providerCycle.map((config) => config.routeId));
   const settledTaskIndexes = new Set();
 
   for (let idx = 0; idx < sentences.length; idx++) {
     if (!shouldRewriteSentence(sentences[idx])) continue;
+    const providerConfig = providerCycle[tasks.length % providerCycle.length];
     tasks.push({
       idx,
       sentObj: sentences[idx],
       sourceIndex: Number.isInteger(sentences[idx].sourceIndex) ? sentences[idx].sourceIndex : idx,
-      promptVariant: academicPromptVariantForIndex()
+      promptVariant: academicPromptVariantForIndex(),
+      providerRouteId: providerConfig.routeId,
+      provider: providerConfig.provider,
+      model: providerConfig.model
     });
   }
   const groups = groupRewriteTasks(tasks, REWRITE_GROUP_SIZE);
@@ -531,7 +578,8 @@ async function rewriteSentences(sentences, {
     requestMode: REWRITE_BATCH_ENABLED ? 'five-sentences-per-request-experimental' : 'one-sentence-per-request',
     sentenceUnits: sentences.length,
     requestCount: REWRITE_BATCH_ENABLED ? groups.length : tasks.length,
-    skippedCount: sentences.length - tasks.length
+    skippedCount: sentences.length - tasks.length,
+    providerCycle: providerCycle.map((config) => `${config.provider}:${config.model}`)
   });
   const auditRunId = beginRewriteAuditRun({
     model: getRewriteConfig().model,
@@ -544,7 +592,8 @@ async function rewriteSentences(sentences, {
     groupCount: groups.length,
     sentenceUnits: sentences.length,
     requestCount: REWRITE_BATCH_ENABLED ? groups.length : tasks.length,
-    skippedCount: sentences.length - tasks.length
+    skippedCount: sentences.length - tasks.length,
+    providerCycle: providerCycle.map(rewriteProviderSummary)
   });
 
   const workerCeiling = Math.min(
@@ -580,7 +629,9 @@ async function rewriteSentences(sentences, {
     return {
       code: error.code || 'DEEPSEEK_FATAL_ERROR',
       status: Number.isInteger(status) ? status : null,
-      message: error.message || 'AI 降重服务不可用'
+      message: error.message || 'AI 降重服务不可用',
+      provider: error.provider || null,
+      model: error.model || null
     };
   }
 
@@ -591,9 +642,15 @@ async function rewriteSentences(sentences, {
     return ['AI_NOT_CONFIGURED', 'DOCUMENT_REWRITE_AI_NOT_CONFIGURED'].includes(String(error.code || ''));
   }
 
-  function registerFatalError(error) {
+  function registerFatalError(error, providerRouteId = null) {
     if (!isFatalRewriteError(error)) return false;
-    if (!fatalError) fatalError = safeErrorSummary(error);
+    const routeId = providerRouteId || error.routeId || (
+      error.provider === 'glm' ? `glm:${error.model || ''}` : 'deepseek'
+    );
+    providerFatalErrors.set(routeId, safeErrorSummary(error));
+    if (!fatalError && providerFatalErrors.size >= providerRouteIds.size) {
+      fatalError = safeErrorSummary(error);
+    }
     return true;
   }
 
@@ -617,7 +674,7 @@ async function rewriteSentences(sentences, {
   }
 
   function failTasks(tasksToFail, error, metadata = {}) {
-    const registeredFatal = registerFatalError(error);
+    const registeredFatal = registerFatalError(error, tasksToFail[0] && tasksToFail[0].providerRouteId);
     for (const task of tasksToFail) {
       settleTask(task, task.sentObj.text, true, {
         attempts: 0,
@@ -632,10 +689,12 @@ async function rewriteSentences(sentences, {
   }
 
   async function executeTask(task, reportPressure, previousTasks = [], groupIndex = null, groupPosition = null) {
-    const { idx, sentObj, promptVariant } = task;
-    if (fatalError) {
-      failTasks([task], fatalError, { groupIndex, groupPosition, skippedAfterFatal: true });
-      return { failed: true, pressure: false, skipIncrease: true, attempts: 0, error: fatalError };
+    const { idx, sentObj, promptVariant, providerRouteId, provider, model } = task;
+    const providerFatalError = providerFatalErrors.get(providerRouteId);
+    if (fatalError || providerFatalError) {
+      const error = fatalError || providerFatalError;
+      failTasks([task], error, { groupIndex, groupPosition, skippedAfterFatal: true });
+      return { failed: true, pressure: false, skipIncrease: true, attempts: 0, error };
     }
     const context = buildChainedRewriteContext(sentences, results, task, previousTasks);
     let lastError = null;
@@ -649,6 +708,7 @@ async function rewriteSentences(sentences, {
           if (delta && onDelta) onDelta(delta, idx, sentObj);
         }, rewriteVersion, {
           context,
+          providerRouteId,
           audit: {
             runId: auditRunId,
             phase: 'primary',
@@ -657,7 +717,10 @@ async function rewriteSentences(sentences, {
             groupIndex,
             groupPosition,
             promptVariant,
-            contextCount: context.previousRewrittenSentences.length
+            contextCount: context.previousRewrittenSentences.length,
+            provider,
+            routeId: providerRouteId,
+            model
           }
         });
         if (!rewritten) {
@@ -671,6 +734,9 @@ async function rewriteSentences(sentences, {
           fallback: false,
           recoveredByFallback: false,
           promptVariant,
+          provider,
+          providerRouteId,
+          model,
           concurrency: currentLimit,
           groupIndex,
           groupPosition
@@ -684,7 +750,7 @@ async function rewriteSentences(sentences, {
           || error.code === 'DEEPSEEK_STREAM_ERROR';
         pressure = pressure || attemptPressure;
         if (attemptPressure && reportPressure) reportPressure();
-        registerFatalError(error);
+        registerFatalError(error, providerRouteId);
         if (attempt >= retryLimit || error.retryable === false) break;
         await sleep(retryDelay(error, attempt));
       }
@@ -695,6 +761,7 @@ async function rewriteSentences(sentences, {
         attempts += 1;
         const fallbackText = await rewriteWithDeepSeekFallback(sentObj.text, rewriteVersion, {
           ...context,
+          providerRouteId,
           audit: {
             runId: auditRunId,
             phase: 'fallback',
@@ -703,7 +770,10 @@ async function rewriteSentences(sentences, {
             groupIndex,
             groupPosition,
             promptVariant,
-            contextCount: context.previousRewrittenSentences.length
+            contextCount: context.previousRewrittenSentences.length,
+            provider,
+            routeId: providerRouteId,
+            model
           }
         });
         if (!fallbackText) {
@@ -717,6 +787,9 @@ async function rewriteSentences(sentences, {
           fallback: false,
           recoveredByFallback: true,
           promptVariant,
+          provider,
+          providerRouteId,
+          model,
           concurrency: currentLimit,
           groupIndex,
           groupPosition
@@ -726,7 +799,7 @@ async function rewriteSentences(sentences, {
         return { failed: false, pressure: false, skipIncrease: pressure, attempts, recoveredByFallback: true };
       } catch (fallbackError) {
         lastError = fallbackError;
-        registerFatalError(fallbackError);
+        registerFatalError(fallbackError, providerRouteId);
       }
     }
 
@@ -735,6 +808,9 @@ async function rewriteSentences(sentences, {
       fallback: true,
       recoveredByFallback: false,
       promptVariant,
+      provider,
+      providerRouteId,
+      model,
       concurrency: currentLimit,
       groupIndex,
       groupPosition
@@ -781,7 +857,7 @@ async function rewriteSentences(sentences, {
     }
   const batchTexts = group.map((task) => task.sentObj.text);
     const firstTask = group[0];
-    const batchContext = { batchTexts };
+    const batchContext = { batchTexts, promptVariant: firstTask.promptVariant };
     let lastError = null;
     let attempts = 0;
     for (let attempt = 0; attempt <= retryLimit; attempt += 1) {
@@ -789,6 +865,7 @@ async function rewriteSentences(sentences, {
       try {
         const output = await rewriteWithDeepSeek('', null, rewriteVersion, {
           context: batchContext,
+          providerRouteId: firstTask.providerRouteId,
           audit: {
             runId: auditRunId,
             phase: 'primary-batch',
@@ -797,7 +874,10 @@ async function rewriteSentences(sentences, {
             groupIndex,
             groupPosition: null,
             contextCount: 0,
-            batchCount: group.length
+            batchCount: group.length,
+            provider: firstTask.provider,
+            routeId: firstTask.providerRouteId,
+            model: firstTask.model
           }
         });
         const rewrittenLines = parseBatchRewriteOutput(output, group.length);
@@ -876,7 +956,8 @@ async function rewriteSentences(sentences, {
           let groupPressure = false;
           let groupFailed = false;
           let groupSkipIncrease = false;
-          if (REWRITE_BATCH_ENABLED && group.length > 1) {
+          const sameProvider = new Set(group.map((task) => task.providerRouteId)).size === 1;
+          if (REWRITE_BATCH_ENABLED && group.length > 1 && sameProvider) {
             const batchOutcome = await executeBatchGroup(group, () => {
               groupPressure = true;
               tune({ pressure: true, failed: false, skipIncrease: true });
@@ -931,7 +1012,14 @@ async function rewriteSentences(sentences, {
     retriedCount,
     fallbackCount,
     fallbackRecoveredCount,
-    fatalError,
+    // If every task failed but only one provider was exercised (for example,
+    // a one-sentence request), preserve that provider's actionable error
+    // instead of replacing it with a generic all-tasks-failed message.
+    fatalError: fatalError || (
+      failedCount >= tasks.length && providerFatalErrors.size
+        ? providerFatalErrors.values().next().value
+        : null
+    ),
     concurrency: {
       adaptive: adaptiveConcurrency,
       min: minimumObserved,

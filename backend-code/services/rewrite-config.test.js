@@ -1,4 +1,10 @@
-const { getRewriteConfig, buildRewritePayload } = require('./rewrite-config');
+const {
+  getRewriteConfig,
+  getGlmRewriteConfigs,
+  getRewriteProviderCycle,
+  getRewriteProviderConfig,
+  buildRewritePayload
+} = require('./rewrite-config');
 
 describe('unified rewrite configuration', () => {
   test('text and document entry points resolve the same rewrite settings', () => {
@@ -60,5 +66,40 @@ describe('unified rewrite configuration', () => {
       thinking: 'enabled',
       reasoningEffort: 'low'
     });
+  });
+
+  test('configures the documented GLM OpenAI-compatible endpoint and low-thinking modes', () => {
+    const env = { GLM_API_KEY: 'glm-test-key' };
+    const configs = getGlmRewriteConfigs(env);
+    expect(configs.map((item) => item.model)).toEqual(['glm-4.7', 'glm-5.3']);
+    expect(configs[0]).toMatchObject({
+      provider: 'glm',
+      routeId: 'glm:glm-4.7',
+      apiKeyEnv: 'GLM_API_KEY',
+      apiBase: 'https://open.bigmodel.cn/api/paas/v4',
+      model: 'glm-4.7'
+    });
+    expect(configs[0].selection).toMatchObject({ thinking: 'enabled', reasoningEffort: '' });
+    expect(configs[1].selection).toMatchObject({ thinking: 'enabled', reasoningEffort: 'low' });
+    expect(buildRewritePayload({ messages: [], stream: true, providerConfig: configs[1] })).toMatchObject({
+      model: 'glm-5.3',
+      stream: true,
+      thinking: { type: 'enabled' },
+      reasoning_effort: 'low'
+    });
+    expect(buildRewritePayload({ messages: [], stream: true, providerConfig: configs[1] }))
+      .not.toHaveProperty('stream_options');
+  });
+
+  test('defaults to DeepSeek and only builds the alternating cycle when explicitly enabled', () => {
+    expect(getRewriteProviderCycle({ DEEPSEEK_API_KEY: 'deepseek-key' }).map((item) => item.routeId))
+      .toEqual(['deepseek']);
+    expect(getRewriteProviderCycle({ DEEPSEEK_API_KEY: 'deepseek-key', GLM_API_KEY: 'glm-key' })
+      .map((item) => item.routeId))
+      .toEqual(['deepseek']);
+    expect(getRewriteProviderCycle({ DEEPSEEK_API_KEY: 'deepseek-key', GLM_API_KEY: 'glm-key', REWRITE_PROVIDER_ROTATION: 'true' })
+      .map((item) => item.routeId))
+      .toEqual(['deepseek', 'glm:glm-4.7', 'deepseek', 'glm:glm-5.3']);
+    expect(getRewriteProviderConfig('glm:glm-5.3', { GLM_API_KEY: 'glm-key' }).model).toBe('glm-5.3');
   });
 });

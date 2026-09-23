@@ -116,6 +116,8 @@ function logDeepSeekSelection(logger, selection, meta = {}) {
     caller: meta.caller || 'unknown',
     traceId: meta.traceId || undefined,
     task: selection.task,
+    provider: selection.provider || 'deepseek',
+    routeId: selection.routeId || undefined,
     model: selection.model,
     modelSource: selection.modelSource,
     reasoning: selection.modelProvidesReasoning ? 'model' : selection.thinking,

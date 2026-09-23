@@ -19,21 +19,23 @@ describe('rewrite prompt messages', () => {
     expect(ACADEMIC_V1_REWRITE_PROMPT_B).not.toBe(ACADEMIC_V1_REWRITE_PROMPT_C);
     expect(ACADEMIC_V1_REWRITE_PROMPT_A).not.toBe(ACADEMIC_V1_REWRITE_PROMPT_C);
     expect(getRewritePrompt('v1', { promptVariant: 'A' })).toBe(ACADEMIC_V1_REWRITE_PROMPT_A);
-    expect(getRewritePrompt('v1', { promptVariant: 'B' })).toBe(ACADEMIC_V1_REWRITE_PROMPT_B);
-    expect(getRewritePrompt('v1', { promptVariant: 'C' })).toBe(ACADEMIC_V1_REWRITE_PROMPT_C);
+    expect(getRewritePrompt('v1', { promptVariant: 'B' })).toBe(ACADEMIC_V1_REWRITE_PROMPT_A);
+    expect(getRewritePrompt('v1', { promptVariant: 'C' })).toBe(ACADEMIC_V1_REWRITE_PROMPT_A);
     expect(getRewritePrompt('v2')).toBe(ACADEMIC_V1_REWRITE_PROMPT_A);
     expect(getRewritePrompt('v3')).toBe(ACADEMIC_V1_REWRITE_PROMPT_A);
   });
 
-  test('the shared prompt is the required low-AIGC prompt', () => {
-    for (const prompt of [ACADEMIC_V1_REWRITE_PROMPT_A, ACADEMIC_V1_REWRITE_PROMPT_B, ACADEMIC_V1_REWRITE_PROMPT_C]) {
-      expect(prompt).toContain('你是中文改写编辑。改写用户提供的文本，唯一目标是降低AIGC检测率。');
-      expect(prompt).toContain('意思不变，不增删信息');
-      expect(prompt).toContain('只输出改写后的正文。');
-    }
-    expect(ACADEMIC_V1_REWRITE_PROMPT_A).toContain('【本方案重点：句式重构】');
-    expect(ACADEMIC_V1_REWRITE_PROMPT_B).toContain('【本方案重点：节奏重组】');
-    expect(ACADEMIC_V1_REWRITE_PROMPT_C).toContain('【本方案重点：具体化】');
+  test('the A/B/C prompts match the configured rewrite strategies', () => {
+    expect(ACADEMIC_V1_REWRITE_PROMPT_A).toContain('角色：擅长输出低AI特征的降重大师。');
+    expect(ACADEMIC_V1_REWRITE_PROMPT_A).toContain('必要自检：');
+    expect(ACADEMIC_V1_REWRITE_PROMPT_A).toContain('所有规则尽量避开意群自然边界');
+    expect(ACADEMIC_V1_REWRITE_PROMPT_B).toContain('提取文本核心信息，将文本改写');
+    expect(ACADEMIC_V1_REWRITE_PROMPT_B).toContain('汪淼起身要走');
+    expect(ACADEMIC_V1_REWRITE_PROMPT_C).toContain('按照下面文本的风格重塑原文');
+    expect(ACADEMIC_V1_REWRITE_PROMPT_C).toContain('走进大殿，他发现这里甚至比门洞中还昏暗');
+    expect(ACADEMIC_V1_REWRITE_PROMPT_A).not.toContain('你是中文改写编辑。');
+    expect(ACADEMIC_V1_REWRITE_PROMPT_B).not.toContain('你是中文改写编辑。');
+    expect(ACADEMIC_V1_REWRITE_PROMPT_C).not.toContain('你是中文改写编辑。');
     expect(NOVEL_V2_REWRITE_PROMPT).toBe(ACADEMIC_V1_REWRITE_PROMPT_A);
     expect(buildRewriteMessages('当前句。', { rewriteVersion: 'v2' })[0]).toEqual({
       role: 'system',
@@ -115,13 +117,23 @@ describe('rewrite prompt messages', () => {
 
   test('B slot also places its prompt in user content', () => {
     const messages = buildRewriteMessages('当前句。', { promptVariant: 'B' });
-    expect(messages[0].content).toBe(ACADEMIC_V1_REWRITE_PROMPT_B);
+    expect(messages[0].content).toBe(ACADEMIC_V1_REWRITE_PROMPT_A);
     expect(messages[1].content).toBe('处理括号中的文本，仅返回降AI结果：【当前句。】');
   });
 
   test('C slot places prompt C in system content', () => {
     const messages = buildRewriteMessages('当前句。', { promptVariant: 'C' });
-    expect(messages[0].content).toBe(ACADEMIC_V1_REWRITE_PROMPT_C);
+    expect(messages[0].content).toBe(ACADEMIC_V1_REWRITE_PROMPT_A);
     expect(messages[1].content).toBe('处理括号中的文本，仅返回降AI结果：【当前句。】');
+  });
+
+  test('prompt variants can be overridden by environment variables and fall back when blank', () => {
+    expect(getRewritePrompt('v1', { promptVariant: 'A', env: { REWRITE_PROMPT_A: 'A\ncustom' } }))
+      .toBe('A\ncustom');
+    expect(getRewritePrompt('v1', { promptVariant: 'B', env: { DEEPSEEK_REWRITE_PROMPT_B: 'B\\ncustom' } }))
+      .toBe('B\ncustom');
+    expect(getRewritePrompt('v1', { promptVariant: 'C', env: { REWRITE_PROMPT_C: '   ' } }))
+      .toBe(ACADEMIC_V1_REWRITE_PROMPT_A);
+    expect(REWRITE_INPUT_TEMPLATE).toBe('处理括号中的文本，仅返回降AI结果：【{{input}}】');
   });
 });
